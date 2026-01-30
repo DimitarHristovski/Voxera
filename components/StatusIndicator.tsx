@@ -1,6 +1,7 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
+import { AlertCircle, Clock, Mic, FileText, Zap, CheckCircle } from 'lucide-react'
 import { t } from '@/lib/i18n'
 
 type PipelineState = 'idle' | 'recording' | 'transcribing' | 'enriching' | 'complete'
@@ -19,7 +20,8 @@ export default function StatusIndicator({ state, error }: StatusIndicatorProps) 
         exit={{ opacity: 0, y: -10 }}
         className="text-center"
       >
-        <div className="inline-flex items-center px-5 py-2.5 bg-red-500/90 backdrop-blur-sm text-white rounded-xl shadow-lg border border-red-400/50">
+        <div className="inline-flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-red-500/30 to-red-600/30 backdrop-blur-xl text-white rounded-2xl shadow-2xl border border-red-400/40">
+          <AlertCircle className="w-5 h-5" />
           <span className="text-sm font-semibold">Error: {error}</span>
         </div>
       </motion.div>
@@ -27,11 +29,41 @@ export default function StatusIndicator({ state, error }: StatusIndicatorProps) 
   }
 
   const statusConfig = {
-    idle: { text: t('idle'), color: 'text-slate-100', bg: 'bg-white/20' },
-    recording: { text: t('recording'), color: 'text-white', bg: 'bg-red-500/90' },
-    transcribing: { text: t('transcribing'), color: 'text-white', bg: 'bg-yellow-500/90' },
-    enriching: { text: t('enriching'), color: 'text-white', bg: 'bg-blue-500/90' },
-    complete: { text: t('complete'), color: 'text-white', bg: 'bg-green-500/90' },
+    idle: { 
+      text: t('idle'), 
+      color: 'text-slate-100', 
+      bg: 'bg-white/20',
+      border: 'border-white/40',
+      Icon: Clock
+    },
+    recording: { 
+      text: t('recording'), 
+      color: 'text-white', 
+      bg: 'bg-red-500/90',
+      border: 'border-red-400/50',
+      Icon: Mic
+    },
+    transcribing: { 
+      text: t('transcribing'), 
+      color: 'text-white', 
+      bg: 'bg-yellow-500/90',
+      border: 'border-yellow-400/50',
+      Icon: FileText
+    },
+    enriching: { 
+      text: t('enriching'), 
+      color: 'text-white', 
+      bg: 'bg-blue-500/90',
+      border: 'border-blue-400/50',
+      Icon: Zap
+    },
+    complete: { 
+      text: t('complete'), 
+      color: 'text-white', 
+      bg: 'bg-green-500/90',
+      border: 'border-green-400/50',
+      Icon: CheckCircle
+    },
   }
 
   const config = statusConfig[state]
@@ -40,18 +72,18 @@ export default function StatusIndicator({ state, error }: StatusIndicatorProps) 
     <AnimatePresence mode="wait">
       <motion.div
         key={state}
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.3 }}
+        initial={{ opacity: 0, scale: 0.9, y: -10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: -10 }}
+        transition={{ duration: 0.4, type: "spring", stiffness: 200 }}
         className="text-center"
       >
-        <div className={`inline-flex items-center gap-3 px-6 py-3 ${config.bg} ${config.color} rounded-xl shadow-xl backdrop-blur-md border border-white/40`}>
+        <div className={`inline-flex items-center gap-3 px-6 py-3 ${config.bg} ${config.color} rounded-xl shadow-xl backdrop-blur-md border ${config.border}`}>
           {state !== 'idle' && (
             <motion.div
               className="relative"
               animate={{
-                scale: [1, 1.2, 1],
+                scale: [1, 1.15, 1],
               }}
               transition={{
                 duration: 1.5,
@@ -59,18 +91,20 @@ export default function StatusIndicator({ state, error }: StatusIndicatorProps) 
                 ease: 'easeInOut',
               }}
             >
-              <div className="w-3 h-3 rounded-full bg-current"></div>
+              <config.Icon className="w-5 h-5" />
               <motion.div
-                className="absolute inset-0 w-3 h-3 rounded-full bg-current"
+                className="absolute inset-0 flex items-center justify-center"
                 animate={{
-                  scale: [1, 2, 1],
-                  opacity: [0.75, 0, 0.75],
+                  scale: [1, 1.8, 1],
+                  opacity: [0.6, 0, 0.6],
                 }}
                 transition={{
                   duration: 1.5,
                   repeat: Infinity,
                 }}
-              />
+              >
+                <config.Icon className="w-5 h-5" />
+              </motion.div>
             </motion.div>
           )}
           <span className="text-sm md:text-base font-semibold tracking-wide">{config.text}</span>

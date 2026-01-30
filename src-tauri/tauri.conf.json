@@ -28,6 +28,7 @@
         "minimize": true,
         "unmaximize": true,
         "unminimize": true,
+        "setFocus": true,
         "startDragging": true
       }
     },

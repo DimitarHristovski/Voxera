@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
     // Support both OPENAI_API_KEY and OPEN_API for compatibility
     const apiBaseUrl = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1'
     const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API || ''
-    const model = process.env.OPENAI_MODEL || 'gpt-4'
+    const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo'
     
     if (!apiBaseUrl) {
       return NextResponse.json(

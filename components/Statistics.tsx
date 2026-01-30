@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { BarChart3, ChevronDown } from 'lucide-react'
 import { calculateCost, formatCost, formatTokens, type TokenUsage } from '@/lib/cost-calculator'
 import { t } from '@/lib/i18n'
 
@@ -111,21 +112,15 @@ export default function Statistics({ usage, type }: StatisticsProps) {
         className="w-full flex items-center justify-between text-left"
       >
         <div className="flex items-center gap-3">
-          <svg className="w-5 h-5 text-slate-100" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
+          <BarChart3 className="w-5 h-5 text-slate-100" />
           <h3 className="text-lg font-semibold text-slate-100">{t('usageStatistics')}</h3>
         </div>
-        <motion.svg
+        <motion.div
           animate={{ rotate: isExpanded ? 180 : 0 }}
           transition={{ duration: 0.3 }}
-          className="w-5 h-5 text-slate-100"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
         >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-        </motion.svg>
+          <ChevronDown className="w-5 h-5 text-slate-100" />
+        </motion.div>
       </motion.button>
 
       <AnimatePresence>

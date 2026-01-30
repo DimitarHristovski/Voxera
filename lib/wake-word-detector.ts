@@ -22,13 +22,29 @@ export class WakeWordDetector {
       return
     }
 
-    if (this.isListening) {
+    // If already listening, don't start again
+    if (this.isListening && this.recognition) {
       console.log('Wake word detection already listening')
       return
     }
 
+    // Clear any existing recognition before starting a new one
+    if (this.recognition) {
+      try {
+        this.recognition.stop()
+      } catch (e) {
+        // Ignore errors when stopping
+      }
+      this.recognition = null
+    }
+
     try {
       this.recognition = new SpeechRecognition()
+      if (!this.recognition) {
+        console.error('Failed to create SpeechRecognition instance')
+        return
+      }
+      
       this.recognition.continuous = true
       this.recognition.interimResults = true // Enable interim results for faster detection
       this.recognition.lang = 'en-US' // Can be made configurable
@@ -60,45 +76,91 @@ export class WakeWordDetector {
         }
       }
 
-    this.recognition.onerror = (event: any) => {
+      if (!this.recognition) return
+      
+      this.recognition.onerror = (event: any) => {
       const error = (event as any).error || 'unknown'
-      console.error('Speech recognition error:', error)
-      // Don't restart on certain errors that indicate permission issues
+      
+      // Handle different error types
       if (error === 'not-allowed' || error === 'service-not-allowed') {
-        console.error('Microphone permission denied')
+        console.error('❌ Microphone permission denied - wake word detection disabled')
         this.isListening = false
+        this.recognition = null
         return
       }
-      // Restart on recoverable errors
-      if (error === 'no-speech' || error === 'aborted' || error === 'network') {
+      
+      // "no-speech" is a normal timeout - not really an error, just restart silently
+      if (error === 'no-speech') {
+        // This is expected - the API times out when no speech is detected
+        // The onend handler will restart it automatically
+        console.log('🔇 No speech detected (timeout) - will restart automatically')
+        return
+      }
+      
+      // Log other errors
+      if (error !== 'aborted') { // Don't log aborted errors (they're intentional)
+        console.warn('⚠️ Speech recognition error:', error)
+      }
+      
+      // Restart on recoverable errors (network issues, etc.)
+      if (error === 'network' || error === 'audio-capture') {
         if (this.isListening) {
+          console.log('🔄 Recoverable error, restarting in 1 second...')
           setTimeout(() => {
-            if (this.isListening && !this.recognition) {
-              this.start()
+            if (this.isListening) {
+              try {
+                this.recognition = null // Clear old recognition
+                this.start()
+              } catch (restartError) {
+                console.error('Failed to restart after error:', restartError)
+              }
             }
           }, 1000)
         }
       }
     }
 
+      if (!this.recognition) return
+      
       this.recognition.onend = () => {
         // Automatically restart if we're still supposed to be listening
         if (this.isListening) {
-          console.log('Speech recognition ended, restarting...')
+          // Clear the recognition object before restarting
+          const wasListening = this.isListening
+          this.recognition = null
+          
+          // Small delay before restarting to avoid rapid restarts
           setTimeout(() => {
-            if (this.isListening && !this.recognition) {
-              this.start()
+            if (wasListening && this.isListening) {
+              try {
+                this.start()
+              } catch (error) {
+                console.error('Failed to restart recognition:', error)
+                this.isListening = false
+                this.recognition = null
+              }
             }
           }, 500)
+        } else {
+          this.recognition = null
         }
       }
 
+      if (!this.recognition) return
+      
       this.recognition.onstart = () => {
-        console.log('✅ Wake word detection started successfully')
+        console.log('✅ Wake word detection started successfully - listening for "Hey Voxera"')
+        this.isListening = true
       }
 
-      this.recognition.start()
-      this.isListening = true
+      try {
+        if (!this.recognition) return
+        this.recognition.start()
+        this.isListening = true
+      } catch (error) {
+        console.error('Failed to start recognition:', error)
+        this.isListening = false
+      }
     } catch (error) {
       console.error('Failed to start wake word detection:', error)
       this.isListening = false

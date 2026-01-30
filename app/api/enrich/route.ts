@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     // Support both OPENAI_API_KEY and OPEN_API for compatibility
     const apiBaseUrl = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1'
     const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API || ''
-    const model = process.env.OPENAI_MODEL || 'gpt-4'
+    const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo'
     
     if (!apiBaseUrl) {
       return NextResponse.json(
@@ -98,8 +98,37 @@ export async function POST(request: NextRequest) {
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Enrichment API error:', response.status, errorText)
+      console.error('API Base URL:', apiBaseUrl)
+      console.error('Model:', model)
+      console.error('Endpoint:', `${apiBaseUrl}/chat/completions`)
+      
+      // Try to parse error message from response
+      let errorMessage = response.statusText || 'Unknown error'
+      try {
+        const errorData = JSON.parse(errorText)
+        if (errorData.error?.message) {
+          errorMessage = errorData.error.message
+        } else if (errorData.message) {
+          errorMessage = errorData.message
+        }
+      } catch (e) {
+        // If parsing fails, use the raw text or status text
+        if (errorText) {
+          errorMessage = errorText.substring(0, 200) // Limit length
+        }
+      }
+      
+      // Provide more helpful error messages
+      if (response.status === 404) {
+        errorMessage = `API endpoint not found. Please check your OPENAI_API_BASE_URL (${apiBaseUrl}). The model "${model}" might not be available.`
+      } else if (response.status === 401) {
+        errorMessage = 'API authentication failed. Please check your API key.'
+      } else if (response.status === 400) {
+        errorMessage = `Bad request: ${errorMessage}. The model "${model}" might not be supported.`
+      }
+      
       return NextResponse.json(
-        { error: `Enrichment failed: ${response.statusText}` },
+        { error: `Enrichment failed: ${errorMessage}` },
         { status: response.status }
       )
     }
@@ -206,7 +235,11 @@ Transcript: ${transcript.substring(0, 500)}` // Use first 500 chars for classifi
     })
 
     if (!response.ok) {
-      console.warn('Classification failed, using default mode')
+      const errorText = await response.text()
+      console.warn('Classification failed:', response.status, errorText)
+      console.warn('API Base URL:', apiBaseUrl)
+      console.warn('Model:', model)
+      console.warn('Using default mode: brain-dump')
       return 'brain-dump' // Default fallback
     }
 

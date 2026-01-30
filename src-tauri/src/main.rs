@@ -4,7 +4,8 @@
 use tauri::{Manager, Window, AppHandle};
 
 // Tauri command to register global hotkeys
-// Desktop-first: Hotkey triggers recording directly, even when window is hidden
+// Desktop-first: Hotkey activates/shows the window AND toggles recording
+// This allows seamless workflow integration - press hotkey to start/stop recording
 #[tauri::command]
 async fn register_hotkey(
     window: Window,
@@ -13,8 +14,8 @@ async fn register_hotkey(
     let app_handle = window.app_handle();
     
     // Register global shortcut using global_shortcut_manager
-    // Default: Command+T (Mac) or Control+T (Windows/Linux)
-    // Desktop-first behavior: Show window AND trigger recording toggle
+    // Default: Control+A (all platforms)
+    // Desktop-first behavior: Show window, bring to front, AND toggle recording
     let shortcut_clone = shortcut.clone();
     app_handle
         .global_shortcut_manager()
@@ -28,18 +29,33 @@ async fn register_hotkey(
                     .or_else(|| _app.windows().values().next().cloned());
                 
                 if let Some(window) = window {
-                    println!(" window found, showing and focusing");
+                    println!("✅ Window found, showing and focusing");
+                    // Ensure window is visible and on top
                     let _ = window.show();
-                    let _ = window.set_focus();
-                    // Trigger recording toggle event
-                    let _ = window.emit("toggle-recording", ());
-                    println!("✅ toggle-recording event emitted");
+                    let _ = window.unminimize(); // Unminimize if minimized
+                    let _ = window.set_focus(); // Bring to front and focus
+                    // Small delay to ensure window is visible before emitting event
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    // Emit event to notify frontend that hotkey was pressed (for window activation)
+                    match window.emit("hotkey-activated", ()) {
+                        Ok(_) => println!("✅ Window activated via hotkey, event emitted"),
+                        Err(e) => println!("❌ Failed to emit hotkey-activated event: {:?}", e),
+                    }
+                    // Also emit toggle-recording event to start/stop recording
+                    match window.emit("toggle-recording", ()) {
+                        Ok(_) => println!("✅ Toggle recording event emitted via hotkey"),
+                        Err(e) => println!("❌ Failed to emit toggle-recording event: {:?}", e),
+                    }
                 } else {
-                    println!("❌ No window found!");
+                    println!("❌ No window found! Available windows: {:?}", _app.windows().keys().collect::<Vec<_>>());
                 }
             }
         })
-        .map_err(|e| format!("Failed to register hotkey '{}': {}", shortcut_clone, e))?;
+        .map_err(|e| {
+            let error_msg = format!("Failed to register hotkey '{}': {}", shortcut_clone, e);
+            println!("❌ Hotkey registration error: {}", error_msg);
+            error_msg
+        })?;
     
     Ok(format!("Hotkey '{}' registered successfully", shortcut))
 }
@@ -58,6 +74,19 @@ async fn toggle_recording(window: Window) -> Result<bool, String> {
 #[tauri::command]
 async fn get_version() -> Result<String, String> {
     Ok(env!("CARGO_PKG_VERSION").to_string())
+}
+
+// Tauri command to get platform
+#[tauri::command]
+async fn get_platform() -> Result<String, String> {
+    #[cfg(target_os = "macos")]
+    return Ok("darwin".to_string());
+    #[cfg(target_os = "windows")]
+    return Ok("win32".to_string());
+    #[cfg(target_os = "linux")]
+    return Ok("linux".to_string());
+    #[cfg(not(any(target_os = "macos", target_os = "windows", target_os = "linux")))]
+    return Ok("unknown".to_string());
 }
 
 // Tauri command to test hotkey registration
@@ -85,6 +114,7 @@ fn main() {
             register_hotkey,
             toggle_recording,
             get_version,
+            get_platform,
             test_hotkey
         ])
         // Desktop-first: Handle window close to hide instead of quit (optional)

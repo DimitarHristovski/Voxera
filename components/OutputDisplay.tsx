@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { X, Edit, Check, Copy, Download, Play, Square, Volume2, Gauge, Music, Languages, Loader2 } from 'lucide-react'
 import Statistics from './Statistics'
 import { t } from '@/lib/i18n'
 
@@ -9,9 +10,10 @@ interface OutputDisplayProps {
   output: string
   onCopy: () => void
   onOutputChange?: (newOutput: string) => void
+  onClose?: () => void
 }
 
-export default function OutputDisplay({ output, onCopy, onOutputChange }: OutputDisplayProps) {
+export default function OutputDisplay({ output, onCopy, onOutputChange, onClose }: OutputDisplayProps) {
   const [copied, setCopied] = useState(false)
   const [isSpeaking, setIsSpeaking] = useState(false)
   const [selectedVoice, setSelectedVoice] = useState<string>('')
@@ -535,11 +537,22 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
       className="mt-8"
     >
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-1 h-8 bg-white/60 rounded-full"></div>
-          <h2 className="text-2xl md:text-3xl font-bold text-white drop-shadow-md">{t('enrichedOutput')}</h2>
-        </div>
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-white/60 rounded-full"></div>
+              <h2 className="text-2xl md:text-3xl font-bold text-white drop-shadow-md">{t('enrichedOutput')}</h2>
+            </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {onClose && (
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={onClose}
+              className="p-2 text-slate-100 hover:text-white hover:bg-red-500/30 rounded-lg transition-all"
+              title="Close output"
+            >
+              <X className="w-4 h-4" />
+            </motion.button>
+          )}
           <AnimatePresence mode="wait">
             {!isEditing ? (
               <motion.button
@@ -552,9 +565,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                 onClick={handleEdit}
                 className="px-5 py-2.5 text-sm font-semibold bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-xl shadow-lg hover:shadow-xl border border-green-400/50 flex items-center gap-2"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>
+                <Edit className="w-4 h-4" />
                 {t('edit')}
               </motion.button>
             ) : (
@@ -571,9 +582,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                   onClick={handleSaveEdit}
                   className="px-5 py-2.5 text-sm font-semibold bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-xl shadow-lg hover:shadow-xl border border-green-400/50 flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <Check className="w-4 h-4" />
                   {t('save')}
                 </motion.button>
                 <motion.button
@@ -582,9 +591,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                   onClick={handleCancelEdit}
                   className="px-5 py-2.5 text-sm font-semibold bg-gray-500/90 hover:bg-gray-600 backdrop-blur-sm text-white rounded-xl shadow-lg hover:shadow-xl border border-gray-400/50 flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <X className="w-4 h-4" />
                   {t('cancel')}
                 </motion.button>
               </motion.div>
@@ -594,7 +601,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             onClick={handleCopy}
-            className="px-5 py-2.5 text-sm font-semibold bg-white/90 hover:bg-white backdrop-blur-sm text-slate-700 rounded-xl shadow-lg hover:shadow-xl border border-white/50 flex items-center gap-2"
+                    className="px-5 py-2.5 text-sm font-semibold bg-white/90 hover:bg-white backdrop-blur-sm text-slate-700 rounded-xl shadow-lg hover:shadow-xl border border-white/50 flex items-center gap-2"
           >
             <AnimatePresence mode="wait">
               {copied ? (
@@ -605,9 +612,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
+                  <Check className="w-4 h-4" />
                   {t('copied')}
                 </motion.span>
               ) : (
@@ -618,9 +623,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                   exit={{ opacity: 0, scale: 0.8 }}
                   className="flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                  </svg>
+                  <Copy className="w-4 h-4" />
                   {t('copy')}
                 </motion.span>
               )}
@@ -634,9 +637,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
             className="px-5 py-2.5 text-sm font-semibold bg-green-500/90 hover:bg-green-600 backdrop-blur-sm text-white rounded-xl shadow-lg hover:shadow-xl border border-green-400/50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             title={t('download')}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-            </svg>
+            <Download className="w-4 h-4" />
             {t('download')}
           </motion.button>
           <motion.button
@@ -679,9 +680,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                   exit={{ opacity: 0 }}
                   className="flex items-center gap-2"
                 >
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.617.793L4.383 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.383l4-3.227a1 1 0 011.617.303zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
-                  </svg>
+                  <Play className="w-4 h-4" />
                   {t('read')}
                 </motion.span>
               )}
@@ -696,9 +695,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
           <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
             <div className="flex-1 w-full md:w-auto">
               <label className="block text-sm font-semibold text-slate-100 mb-2.5 flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                </svg>
+                <Languages className="w-4 h-4" />
                 Translate to
               </label>
               <div className="flex gap-2">
@@ -721,17 +718,12 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
                 >
                   {isTranslating ? (
                     <>
-                      <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
+                      <Loader2 className="animate-spin h-4 w-4" />
                       Translating...
                     </>
                   ) : (
                     <>
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129" />
-                      </svg>
+                      <Languages className="w-4 h-4" />
                       Translate
                     </>
                   )}
@@ -748,9 +740,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
           {/* Voice Selection */}
           <div>
             <label className="block text-sm font-semibold text-slate-100 mb-2.5 flex items-center gap-2">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-              </svg>
+              <Volume2 className="w-4 h-4" />
               {t('voice')}
             </label>
             <select
@@ -784,9 +774,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
           <div>
             <label className="block text-sm font-semibold text-slate-100 mb-2.5 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
+                <Gauge className="w-4 h-4" />
                 {t('speed')}
               </span>
               <span className="text-xs bg-white/20 px-2 py-1 rounded font-mono">{speechRate.toFixed(1)}x</span>
@@ -810,9 +798,7 @@ export default function OutputDisplay({ output, onCopy, onOutputChange }: Output
           <div>
             <label className="block text-sm font-semibold text-slate-100 mb-2.5 flex items-center justify-between">
               <span className="flex items-center gap-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
+                <Music className="w-4 h-4" />
                 {t('pitch')}
               </span>
               <span className="text-xs bg-white/20 px-2 py-1 rounded font-mono">{speechPitch.toFixed(1)}</span>
