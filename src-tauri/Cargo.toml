@@ -1,0 +1,23 @@
+[package]
+name = "voxera"
+version = "0.1.0"
+description = "VOXERA - Voice capture and AI enrichment desktop app"
+authors = ["you"]
+license = ""
+repository = ""
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[build-dependencies]
+tauri-build = { version = "1.5", features = [] }
+
+[dependencies]
+tauri = { version = "1.5", features = [ "window-unminimize", "window-unmaximize", "window-close", "window-minimize", "window-show", "window-maximize", "window-hide", "window-start-dragging", "global-shortcut-all", "global-shortcut", "shell-open"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[features]
+# This feature is used for production builds or when `devPath` points to the filesystem
+custom-protocol = ["tauri/custom-protocol"]
+
