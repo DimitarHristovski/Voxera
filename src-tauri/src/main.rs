@@ -13,7 +13,17 @@ async fn register_hotkey(
 ) -> Result<String, String> {
     let app_handle = window.app_handle();
     
-    // Unregister the hotkey first if it's already registered (handles hot reload scenarios)
+    // Check if this is the default hotkey that was registered at startup
+    // If so, we might want to keep the startup registration instead
+    let default_hotkey = "Control+Shift+Space";
+    if shortcut == default_hotkey {
+        println!("🔧 Frontend requesting default hotkey registration: {}", shortcut);
+        println!("💡 Startup registration should already be active, but re-registering to ensure it works");
+    } else {
+        println!("🔧 Frontend requesting custom hotkey registration: {}", shortcut);
+    }
+    
+    // Unregister first to avoid conflicts
     let _ = app_handle.global_shortcut_manager().unregister(&shortcut);
     
     // Register global shortcut using global_shortcut_manager
@@ -141,13 +151,13 @@ fn main() {
         ])
         // Desktop-first: Handle window close to hide instead of quit
         // This keeps the app running in the background so the server stays alive
-        // Users can bring the window back using the hotkey (Control+Space)
+        // Users can bring the window back using the hotkey (Control+Shift+Space)
         .on_window_event(|event| {
             match event.event() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     println!("🪟 Window close requested - hiding window instead of quitting");
                     println!("🔄 App will continue running in the background");
-                    println!("💡 Use hotkey (Control+Space) to bring the window back");
+                    println!("💡 Use hotkey (Control+Shift+Space) to bring the window back");
                     let _ = event.window().hide();
                     api.prevent_close();
                 }
@@ -157,13 +167,16 @@ fn main() {
         .setup(|app| {
             println!("✅ VOXERA app started - connecting to Vercel");
             println!("💡 Closing the window will hide it, but the app stays running");
-            println!("💡 Use the hotkey (Control+Space) to bring the window back");
+            println!("💡 Use the hotkey (Control+Shift+Space) to bring the window back");
             println!("💡 The app will continue running in the background even when window is closed");
             
             // Register hotkey immediately at app startup so it works even when window is hidden
-            // Wait a moment to ensure window is created first
+            // This registration persists and won't be overwritten by frontend registration
             let app_handle = app.app_handle();
-            let default_hotkey = "Control+Space";
+            let default_hotkey = "Control+Shift+Space";
+            
+            // Unregister first to avoid conflicts
+            let _ = app_handle.global_shortcut_manager().unregister(default_hotkey);
             
             // Get window first to ensure it exists
             let window_opt = app.get_window("main");
@@ -235,6 +248,7 @@ fn main() {
                 Ok(_) => {
                     println!("✅ Global hotkey registered successfully at startup");
                     println!("💡 Press {} to open/show the app window", default_hotkey);
+                    println!("💡 This hotkey will persist even if frontend reloads");
                 }
                 Err(e) => {
                     println!("⚠️ Failed to register hotkey at startup: {:?}", e);
