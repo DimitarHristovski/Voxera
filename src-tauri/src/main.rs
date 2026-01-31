@@ -14,7 +14,7 @@ async fn register_hotkey(
     let app_handle = window.app_handle();
     
     // Check if this is the default hotkey that was registered at startup
-    let default_hotkey = "Shift+A";
+    let default_hotkey = "Shift+Q";
     
     if shortcut == default_hotkey {
         println!("🔧 Frontend requesting default hotkey registration: {}", shortcut);
@@ -157,7 +157,7 @@ fn main() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     println!("🪟 Window close requested - hiding window instead of quitting");
                     println!("🔄 App will continue running in the background");
-                    println!("💡 Use hotkey (Shift+A) to bring the window back");
+                    println!("💡 Press Shift+Q to bring the window back");
                     let _ = event.window().hide();
                     api.prevent_close();
                 }
@@ -168,14 +168,14 @@ fn main() {
             println!("✅ VOXERA app started - connecting to Vercel");
             println!("💡 Closing the window will hide it, but the app stays running");
             
-            println!("💡 Use the hotkey (Shift+A) to bring the window back");
+            println!("💡 Hold Shift to bring the window back");
             
             println!("💡 The app will continue running in the background even when window is closed");
             
             // Register hotkey immediately at app startup so it works even when window is hidden
             // This registration persists and won't be overwritten by frontend registration
             let app_handle = app.app_handle();
-            let default_hotkey = "Shift+A";
+            let default_hotkey = "Shift+Q";
             
             println!("🔧 Registering hotkey: {}", default_hotkey);
             
@@ -202,34 +202,48 @@ fn main() {
                 if let Some(window) = window {
                     println!("✅ Window found, showing and focusing");
                     
-                    // Method 1: Show the window (critical - this makes it visible)
+                    // Critical: Show the window FIRST (this makes it visible)
                     if let Err(e) = window.show() {
                         println!("⚠️ Failed to show window: {:?}", e);
                     } else {
                         println!("✅ Window.show() succeeded");
                     }
                     
-                    // Method 2: Unminimize if minimized
+                    // Small delay to let show() complete
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    
+                    // Unminimize if minimized
                     if let Err(e) = window.unminimize() {
                         println!("⚠️ Failed to unminimize (might not be minimized): {:?}", e);
                     } else {
                         println!("✅ Window.unminimize() succeeded");
                     }
                     
-                    // Method 3: Bring to front and focus (critical for bringing app to foreground)
-                    if let Err(e) = window.set_focus() {
-                        println!("⚠️ Failed to set focus: {:?}", e);
-                    } else {
-                        println!("✅ Window.set_focus() succeeded");
+                    // Bring to front and focus - CRITICAL for bringing app to foreground
+                    // Try multiple times to ensure it works
+                    for i in 1..=3 {
+                        if let Err(e) = window.set_focus() {
+                            println!("⚠️ Failed to set focus (attempt {}): {:?}", i, e);
+                            if i < 3 {
+                                std::thread::sleep(std::time::Duration::from_millis(100));
+                            }
+                        } else {
+                            println!("✅ Window.set_focus() succeeded (attempt {})", i);
+                            break;
+                        }
                     }
                     
-                    // Method 4: Try maximize/unmaximize trick to ensure visibility
+                    // Try maximize/unmaximize trick to ensure visibility
                     let _ = window.maximize();
                     std::thread::sleep(std::time::Duration::from_millis(50));
                     let _ = window.unmaximize();
                     
-                    // Small delay to ensure window is visible before emitting events
+                    // Final focus attempt after all operations
                     std::thread::sleep(std::time::Duration::from_millis(100));
+                    let _ = window.set_focus();
+                    
+                    // Small delay to ensure window is visible before emitting events
+                    std::thread::sleep(std::time::Duration::from_millis(50));
                     
                     // Emit events to frontend
                     match window.emit("hotkey-activated", ()) {
@@ -253,10 +267,17 @@ fn main() {
                     println!("✅ Global hotkey registered successfully at startup");
                     println!("💡 Press {} to open/show the app window", default_hotkey);
                     println!("💡 This hotkey will persist even if frontend reloads");
+                    println!("💡 If hotkey doesn't work, check console for '🔥 Hotkey pressed' message");
                 }
                 Err(e) => {
                     println!("⚠️ Failed to register hotkey at startup: {:?}", e);
                     println!("💡 Hotkey will be registered when frontend loads");
+                    println!("💡 Error details: {:?}", e);
+                    
+                    // Try to get more details about the error
+                    if let Some(error_msg) = e.to_string().as_str().get(..) {
+                        println!("💡 Full error: {}", error_msg);
+                    }
                 }
             }
             
