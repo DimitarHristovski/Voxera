@@ -14,8 +14,12 @@ async fn register_hotkey(
     let app_handle = window.app_handle();
     
     // Check if this is the default hotkey that was registered at startup
-    // If so, we might want to keep the startup registration instead
-    let default_hotkey = "Control+Shift+Space";
+    // Platform-specific default hotkeys
+    #[cfg(target_os = "macos")]
+    let default_hotkey = "Meta+A";
+    #[cfg(not(target_os = "macos"))]
+    let default_hotkey = "Alt+A";
+    
     if shortcut == default_hotkey {
         println!("🔧 Frontend requesting default hotkey registration: {}", shortcut);
         println!("💡 Startup registration should already be active, but re-registering to ensure it works");
@@ -151,13 +155,16 @@ fn main() {
         ])
         // Desktop-first: Handle window close to hide instead of quit
         // This keeps the app running in the background so the server stays alive
-        // Users can bring the window back using the hotkey (Control+Shift+Space)
+        // Users can bring the window back using platform-specific hotkeys
         .on_window_event(|event| {
             match event.event() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     println!("🪟 Window close requested - hiding window instead of quitting");
                     println!("🔄 App will continue running in the background");
-                    println!("💡 Use hotkey (Control+Shift+Space) to bring the window back");
+                    #[cfg(target_os = "macos")]
+                    println!("💡 Use hotkey (Command+A) to bring the window back");
+                    #[cfg(not(target_os = "macos"))]
+                    println!("💡 Use hotkey (Alt+A) to bring the window back");
                     let _ = event.window().hide();
                     api.prevent_close();
                 }
@@ -167,13 +174,26 @@ fn main() {
         .setup(|app| {
             println!("✅ VOXERA app started - connecting to Vercel");
             println!("💡 Closing the window will hide it, but the app stays running");
-            println!("💡 Use the hotkey (Control+Shift+Space) to bring the window back");
+            
+            // Platform-specific hotkey message
+            #[cfg(target_os = "macos")]
+            println!("💡 Use the hotkey (Command+A) to bring the window back");
+            #[cfg(not(target_os = "macos"))]
+            println!("💡 Use the hotkey (Alt+A) to bring the window back");
+            
             println!("💡 The app will continue running in the background even when window is closed");
             
             // Register hotkey immediately at app startup so it works even when window is hidden
             // This registration persists and won't be overwritten by frontend registration
             let app_handle = app.app_handle();
-            let default_hotkey = "Control+Shift+Space";
+            
+            // Platform-specific hotkeys
+            #[cfg(target_os = "macos")]
+            let default_hotkey = "Meta+A"; // Command+A on macOS
+            #[cfg(not(target_os = "macos"))]
+            let default_hotkey = "Alt+A"; // Alt+A on Windows/Linux
+            
+            println!("🔧 Platform detected, using hotkey: {}", default_hotkey);
             
             // Unregister first to avoid conflicts
             let _ = app_handle.global_shortcut_manager().unregister(default_hotkey);

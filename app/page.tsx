@@ -460,21 +460,37 @@ export default function Home() {
         import('@tauri-apps/api/tauri'),
         import('@tauri-apps/api/event')
       ]).then(async ([{ invoke }, { listen }]) => {
-        // Register hotkey: Ctrl+Shift+Space (all platforms)
-        const hotkey = 'Control+Shift+Space'
-        console.log('🔧 Attempting to register hotkey:', hotkey)
+        // Get platform to determine correct hotkey
+        let detectedPlatform = 'unknown'
+        try {
+          detectedPlatform = await invoke('get_platform') as string
+          setPlatform(detectedPlatform)
+        } catch (e) {
+          console.warn('⚠️ Could not get platform, defaulting to Windows/Linux hotkey')
+        }
+        
+        // Platform-specific hotkeys
+        // macOS: Command+A (Meta+A in Tauri)
+        // Windows/Linux: Alt+A
+        const platformHotkey = detectedPlatform === 'darwin' 
+          ? 'Meta+A'  // macOS
+          : 'Alt+A'   // Windows/Linux
+        
+        setHotkey(platformHotkey)
+        console.log('🔧 Platform detected:', detectedPlatform)
+        console.log('🔧 Attempting to register hotkey:', platformHotkey)
         
         // Function to register the hotkey
         const registerHotkey = async (): Promise<boolean> => {
           try {
-            const result = await invoke('register_hotkey', { shortcut: hotkey })
+            const result = await invoke('register_hotkey', { shortcut: platformHotkey })
             console.log('✅ Hotkey registration successful:', result)
             setHotkeyStatus('registered')
-            console.log('💡 Press', hotkey, 'to activate the window and toggle recording')
+            console.log('💡 Press', platformHotkey, 'to activate the window and toggle recording')
             return true
           } catch (err: any) {
             const errorMsg = err?.toString() || JSON.stringify(err)
-            console.error(`❌ Failed to register hotkey '${hotkey}':`, errorMsg)
+            console.error(`❌ Failed to register hotkey '${platformHotkey}':`, errorMsg)
             setHotkeyStatus('failed')
             console.warn('⚠️ Hotkey registration failed. App will work with button clicks and wake word.')
             return false
@@ -874,7 +890,7 @@ export default function Home() {
             <Video className="w-4 h-4 text-slate-100" />
             <span className="text-sm text-slate-100 font-medium">{t('press')}</span>
             <kbd className="px-3 py-1.5 bg-white/40 backdrop-blur-sm text-white rounded-lg text-xs md:text-sm font-mono font-bold border border-white/50 shadow-md">
-              Ctrl+Shift+Space
+              {platform === 'darwin' ? 'Cmd+A' : 'Alt+A'}
             </kbd>
             <span className="text-sm text-slate-100 font-medium">{t('toActivate')}</span>
             <span className="text-xs text-slate-200/80 ml-2">({t('orSay')} "Hey Voxera" {t('toRecord')})</span>
@@ -1256,7 +1272,7 @@ export default function Home() {
                       <h4 className="font-semibold text-slate-800 mb-1">{t('activateWindow')}</h4>
                       <p className="text-sm text-slate-600 mb-2">{t('activateWindowDesc')}</p>
                       <kbd className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono text-slate-700">
-                        Ctrl+Shift+Space
+                        {platform === 'darwin' ? 'Cmd+A' : 'Alt+A'}
                       </kbd>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -1302,7 +1318,7 @@ export default function Home() {
                   <div className="p-4 bg-green-50 rounded-xl border border-green-200">
                     <p className="text-sm text-green-800 font-medium">
                       ✅ {t('hotkeyRegistered')}: <kbd className="px-2 py-1 bg-white border border-green-300 rounded text-xs font-mono ml-1">
-                        Ctrl+Shift+Space
+                        {platform === 'darwin' ? 'Cmd+A' : 'Alt+A'}
                       </kbd>
                     </p>
                   </div>
