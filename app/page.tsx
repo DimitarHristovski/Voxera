@@ -298,42 +298,55 @@ export default function Home() {
               setEnrichmentUsage(undefined)
             } else {
               setMicrophonePermissionStatus('denied')
-              // Provide detailed error message for production builds only
               const isMac = typeof navigator !== 'undefined' && 
                 (navigator as any).platform?.toLowerCase().includes('mac')
-              // Check if running in production build (not dev mode)
-              const isProduction = typeof window !== 'undefined' && 
-                !window.location.href.includes('localhost') && 
-                !window.location.href.includes('127.0.0.1')
+              const isDevMode = typeof window !== 'undefined' && 
+                (window.location.href.includes('localhost') || 
+                 window.location.href.includes('127.0.0.1'))
               
-              const errorMsg = isMac && isProduction
-                ? 'Microphone permission required. ' +
+              let errorMsg = ''
+              if (isMac && isDevMode) {
+                errorMsg = 'Microphone permission required (Dev Mode). ' +
+                  'In dev mode, grant permission to Terminal: System Settings → Privacy & Security → Microphone → Enable Terminal. ' +
+                  'If Terminal is not listed, click the record button to trigger the permission dialog. ' +
+                  'Then click the record button again.'
+              } else if (isMac) {
+                errorMsg = 'Microphone permission required. ' +
                   'Common issues: (1) Permission granted to Terminal instead of VOXERA - grant permission to VOXERA. ' +
                   '(2) Need to relaunch - after granting permission, quit (Cmd+Q) and restart the app. ' +
                   '(3) Check System Settings → Privacy & Security → Microphone → Enable VOXERA. ' +
                   'See MICROPHONE_PERMISSIONS.md for details.'
-                : 'Microphone permission is required to record. ' +
+              } else {
+                errorMsg = 'Microphone permission is required to record. ' +
                   'A permission dialog should appear - please click "Allow" or "Grant". ' +
                   'If no dialog appears, check your system settings and grant microphone access, then click the record button again.'
+              }
               setError(errorMsg)
             }
           } catch (retryError) {
             setMicrophonePermissionStatus('denied')
             const isMac = typeof navigator !== 'undefined' && 
               (navigator as any).platform?.toLowerCase().includes('mac')
-            // Only show detailed instructions for production builds
-            const isProduction = typeof window !== 'undefined' && 
-              !window.location.href.includes('localhost') && 
-              !window.location.href.includes('127.0.0.1')
+            const isDevMode = typeof window !== 'undefined' && 
+              (window.location.href.includes('localhost') || 
+               window.location.href.includes('127.0.0.1'))
             
-            const errorMsg = isMac && isProduction
-              ? 'Microphone permission required. ' +
+            let errorMsg = ''
+            if (isMac && isDevMode) {
+              errorMsg = 'Microphone permission required (Dev Mode). ' +
+                'Grant permission to Terminal: System Settings → Privacy & Security → Microphone → Enable Terminal. ' +
+                'If Terminal is not listed, click the record button to trigger the permission dialog. ' +
+                'Then click the record button again to retry.'
+            } else if (isMac) {
+              errorMsg = 'Microphone permission required. ' +
                 'Grant permission to VOXERA: System Settings → Privacy & Security → Microphone → Enable VOXERA. ' +
                 'Then quit the app (Cmd+Q) and relaunch. ' +
                 'See MICROPHONE_PERMISSIONS.md for troubleshooting.'
-              : 'Microphone permission required. ' +
+            } else {
+              errorMsg = 'Microphone permission required. ' +
                 'Please grant microphone access when the dialog appears, or check your system settings. ' +
                 'Click the record button again to retry.'
+            }
             setError(errorMsg)
           }
         }, 1000)
@@ -630,14 +643,49 @@ export default function Home() {
       const formData = new FormData()
       formData.append('audio', audioBlob, 'recording.webm')
       
+      console.log('📤 Sending transcription request:', {
+        url: '/api/transcribe',
+        audioSize: audioBlob.size,
+        audioType: audioBlob.type,
+        isTauri: typeof window !== 'undefined' && '__TAURI_IPC__' in window,
+        currentUrl: typeof window !== 'undefined' ? window.location.href : 'unknown'
+      })
+      
       const transcriptResponse = await fetch('/api/transcribe', {
         method: 'POST',
         body: formData,
       })
 
+      console.log('📥 Transcription response:', {
+        status: transcriptResponse.status,
+        statusText: transcriptResponse.statusText,
+        ok: transcriptResponse.ok,
+        headers: Object.fromEntries(transcriptResponse.headers.entries())
+      })
+
       if (!transcriptResponse.ok) {
         const errorData = await transcriptResponse.json().catch(() => ({}))
-        throw new Error(errorData.error || 'Transcription failed')
+        console.error('❌ Transcription failed:', errorData)
+        
+        // Log diagnostic info if available
+        if (errorData.diagnostics) {
+          console.error('🔍 Diagnostic Info:', errorData.diagnostics)
+          if (errorData.diagnostics.openaiError) {
+            console.error('📢 OpenAI Error:', errorData.diagnostics.openaiError)
+          }
+        }
+        
+        // Build error message with diagnostics
+        let errorMsg = errorData.error || 'Transcription failed'
+        if (errorData.diagnostics) {
+          if (!errorData.diagnostics.authHeaderSet) {
+            errorMsg += ' (API key not being sent in request)'
+          } else if (errorData.diagnostics.openaiError) {
+            errorMsg += ` - ${JSON.stringify(errorData.diagnostics.openaiError)}`
+          }
+        }
+        
+        throw new Error(errorMsg)
       }
 
       const { transcript: transcribedText, language: detectedLanguage } = await transcriptResponse.json()

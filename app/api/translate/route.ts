@@ -29,10 +29,23 @@ export async function POST(request: NextRequest) {
     }
 
     // Use local or cloud OpenAI API
-    // Support both OPENAI_API_KEY and OPEN_API for compatibility
+    // Use OPEN_KEY from .env.local
     const apiBaseUrl = process.env.OPENAI_API_BASE_URL || 'https://api.openai.com/v1'
-    const apiKey = process.env.OPENAI_API_KEY || process.env.OPEN_API || ''
+    // Trim whitespace from API key (common issue with .env files)
+    const apiKey = (process.env.OPEN_KEY || '').trim()
     const model = process.env.OPENAI_MODEL || 'gpt-3.5-turbo'
+    
+    // Check if API key is required
+    if (!apiKey) {
+      console.error('❌ OPEN_KEY is not set in .env.local')
+      return NextResponse.json(
+        { 
+          error: 'API key not configured. Please set OPEN_KEY in your .env.local file and restart the server.',
+          details: 'The OPEN_KEY environment variable is missing or empty.'
+        },
+        { status: 500 }
+      )
+    }
     
     if (!apiBaseUrl) {
       return NextResponse.json(

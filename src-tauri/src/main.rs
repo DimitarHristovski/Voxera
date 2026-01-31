@@ -165,7 +165,7 @@ fn main() {
             }
         })
         .setup(|app| {
-            println!("✅ VOXERA app started - connecting to Vercel");
+            println!("✅ VOXERA app started - connecting to local server");
             println!("💡 Closing the window will hide it, but the app stays running");
             
             println!("💡 Hold Shift to bring the window back");
@@ -330,70 +330,9 @@ fn main() {
             }
             
             
-            // Navigate to Vercel URL - use multiple methods to ensure it works
-            let vercel_url = "https://voxera-peach.vercel.app";
-            if let Some(window) = app.get_window("main") {
-                println!("🌐 Navigating to: {}", vercel_url);
-                
-                // Method 1: Immediate aggressive navigation
-                let nav_script = format!(
-                    r#"
-                    (function() {{
-                        const targetUrl = '{}';
-                        console.log('Current URL:', window.location.href);
-                        console.log('Target URL:', targetUrl);
-                        
-                        // Force immediate navigation
-                        try {{
-                            window.location.replace(targetUrl);
-                        }} catch(e) {{
-                            console.error('Replace failed:', e);
-                            window.location.href = targetUrl;
-                        }}
-                    }})();
-                    "#,
-                    vercel_url
-                );
-                
-                // Execute immediately
-                if let Err(e) = window.eval(&nav_script) {
-                    println!("⚠️ Failed to navigate via eval: {:?}", e);
-                } else {
-                    println!("✅ Navigation script executed");
-                }
-                
-                // Method 2: Multiple delayed attempts to ensure navigation
-                let window_clone1 = window.clone();
-                let window_clone2 = window.clone();
-                let window_clone3 = window.clone();
-                
-                // Attempt 1: After 200ms
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(200));
-                    let script = format!(r#"window.location.replace('{}');"#, vercel_url);
-                    if let Err(e) = window_clone1.eval(&script) {
-                        println!("⚠️ Delayed navigation 1 failed: {:?}", e);
-                    }
-                });
-                
-                // Attempt 2: After 500ms
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    let script = format!(r#"if (!window.location.href.includes('voxera-peach.vercel.app')) {{ window.location.href = '{}'; }}"#, vercel_url);
-                    if let Err(e) = window_clone2.eval(&script) {
-                        println!("⚠️ Delayed navigation 2 failed: {:?}", e);
-                    }
-                });
-                
-                // Attempt 3: After 1000ms (last resort)
-                std::thread::spawn(move || {
-                    std::thread::sleep(std::time::Duration::from_millis(1000));
-                    let script = format!(r#"window.top.location.href = '{}';"#, vercel_url);
-                    if let Err(e) = window_clone3.eval(&script) {
-                        println!("⚠️ Delayed navigation 3 failed: {:?}", e);
-                    }
-                });
-            }
+            // App will load from devPath in tauri.conf.json (http://localhost:3000)
+            // No need to navigate - Tauri handles this automatically
+            println!("🌐 App will load from: http://localhost:3000 (configured in tauri.conf.json)");
             
             Ok(())
         })
