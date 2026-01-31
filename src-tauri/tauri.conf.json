@@ -1,8 +1,8 @@
 {
   "build": {
-    "beforeDevCommand": "npm run dev",
+    "beforeDevCommand": "",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:3000",
+    "devPath": "https://voxera-peach.vercel.app",
     "distDir": "../.next/standalone",
     "withGlobalTauri": false
   },
