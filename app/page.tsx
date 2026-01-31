@@ -460,8 +460,8 @@ export default function Home() {
         import('@tauri-apps/api/tauri'),
         import('@tauri-apps/api/event')
       ]).then(async ([{ invoke }, { listen }]) => {
-        // Register hotkey: Ctrl+Shift+A (all platforms)
-        const hotkey = 'Control+Shift+A'
+        // Register hotkey: Ctrl+Space (all platforms)
+        const hotkey = 'Control+Space'
         console.log('🔧 Attempting to register hotkey:', hotkey)
         
         // Function to register the hotkey
@@ -874,7 +874,7 @@ export default function Home() {
             <Video className="w-4 h-4 text-slate-100" />
             <span className="text-sm text-slate-100 font-medium">{t('press')}</span>
             <kbd className="px-3 py-1.5 bg-white/40 backdrop-blur-sm text-white rounded-lg text-xs md:text-sm font-mono font-bold border border-white/50 shadow-md">
-              Ctrl+Shift+A
+              Ctrl+Space
             </kbd>
             <span className="text-sm text-slate-100 font-medium">{t('toActivate')}</span>
             <span className="text-xs text-slate-200/80 ml-2">({t('orSay')} "Hey Voxera" {t('toRecord')})</span>
@@ -1256,7 +1256,7 @@ export default function Home() {
                       <h4 className="font-semibold text-slate-800 mb-1">{t('activateWindow')}</h4>
                       <p className="text-sm text-slate-600 mb-2">{t('activateWindowDesc')}</p>
                       <kbd className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono text-slate-700">
-                        Ctrl+Shift+A
+                        Ctrl+Space
                       </kbd>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -1302,7 +1302,7 @@ export default function Home() {
                   <div className="p-4 bg-green-50 rounded-xl border border-green-200">
                     <p className="text-sm text-green-800 font-medium">
                       ✅ {t('hotkeyRegistered')}: <kbd className="px-2 py-1 bg-white border border-green-300 rounded text-xs font-mono ml-1">
-                        Ctrl+Shift+A
+                        Ctrl+Space
                       </kbd>
                     </p>
                   </div>

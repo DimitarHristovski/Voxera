@@ -141,13 +141,13 @@ fn main() {
         ])
         // Desktop-first: Handle window close to hide instead of quit
         // This keeps the app running in the background so the server stays alive
-        // Users can bring the window back using the hotkey (Control+Shift+A)
+        // Users can bring the window back using the hotkey (Control+Space)
         .on_window_event(|event| {
             match event.event() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     println!("🪟 Window close requested - hiding window instead of quitting");
                     println!("🔄 App will continue running in the background");
-                    println!("💡 Use hotkey (Control+Shift+A) to bring the window back");
+                    println!("💡 Use hotkey (Control+Space) to bring the window back");
                     let _ = event.window().hide();
                     api.prevent_close();
                 }
@@ -157,8 +157,90 @@ fn main() {
         .setup(|app| {
             println!("✅ VOXERA app started - connecting to Vercel");
             println!("💡 Closing the window will hide it, but the app stays running");
-            println!("💡 Use the hotkey (Control+Shift+A) to bring the window back");
+            println!("💡 Use the hotkey (Control+Space) to bring the window back");
             println!("💡 The app will continue running in the background even when window is closed");
+            
+            // Register hotkey immediately at app startup so it works even when window is hidden
+            // Wait a moment to ensure window is created first
+            let app_handle = app.app_handle();
+            let default_hotkey = "Control+Space";
+            
+            // Get window first to ensure it exists
+            let window_opt = app.get_window("main");
+            if window_opt.is_none() {
+                println!("⚠️ Window 'main' not found at startup, will register hotkey anyway");
+            } else {
+                println!("✅ Window 'main' found at startup");
+            }
+            
+            println!("🔧 Registering global hotkey at startup: {}", default_hotkey);
+            
+            let app_handle_clone = app_handle.clone();
+            match app_handle.global_shortcut_manager().register(default_hotkey, move || {
+                println!("🔥 Hotkey pressed: {}", default_hotkey);
+                // Find the window - try multiple methods
+                let window = app_handle_clone.get_window("main")
+                    .or_else(|| app_handle_clone.windows().values().next().cloned());
+                
+                if let Some(window) = window {
+                    println!("✅ Window found, showing and focusing");
+                    
+                    // Method 1: Show the window (critical - this makes it visible)
+                    if let Err(e) = window.show() {
+                        println!("⚠️ Failed to show window: {:?}", e);
+                    } else {
+                        println!("✅ Window.show() succeeded");
+                    }
+                    
+                    // Method 2: Unminimize if minimized
+                    if let Err(e) = window.unminimize() {
+                        println!("⚠️ Failed to unminimize (might not be minimized): {:?}", e);
+                    } else {
+                        println!("✅ Window.unminimize() succeeded");
+                    }
+                    
+                    // Method 3: Bring to front and focus (critical for bringing app to foreground)
+                    if let Err(e) = window.set_focus() {
+                        println!("⚠️ Failed to set focus: {:?}", e);
+                    } else {
+                        println!("✅ Window.set_focus() succeeded");
+                    }
+                    
+                    // Method 4: Try maximize/unmaximize trick to ensure visibility
+                    let _ = window.maximize();
+                    std::thread::sleep(std::time::Duration::from_millis(50));
+                    let _ = window.unmaximize();
+                    
+                    // Small delay to ensure window is visible before emitting events
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    
+                    // Emit events to frontend
+                    match window.emit("hotkey-activated", ()) {
+                        Ok(_) => println!("✅ hotkey-activated event emitted"),
+                        Err(e) => println!("⚠️ Failed to emit hotkey-activated: {:?}", e),
+                    }
+                    match window.emit("toggle-recording", ()) {
+                        Ok(_) => println!("✅ toggle-recording event emitted"),
+                        Err(e) => println!("⚠️ Failed to emit toggle-recording: {:?}", e),
+                    }
+                    
+                    println!("✅ Window opened and focused via hotkey - all operations completed");
+                } else {
+                    println!("❌ No window found when hotkey pressed!");
+                    println!("   Available windows: {:?}", app_handle_clone.windows().keys().collect::<Vec<_>>());
+                    // Try to create a new window if none exists
+                    println!("   Attempting to get or create window...");
+                }
+            }) {
+                Ok(_) => {
+                    println!("✅ Global hotkey registered successfully at startup");
+                    println!("💡 Press {} to open/show the app window", default_hotkey);
+                }
+                Err(e) => {
+                    println!("⚠️ Failed to register hotkey at startup: {:?}", e);
+                    println!("💡 Hotkey will be registered when frontend loads");
+                }
+            }
             
             // Navigate to Vercel URL - use multiple methods to ensure it works
             let vercel_url = "https://voxera-peach.vercel.app";
