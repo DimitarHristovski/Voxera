@@ -1,9 +1,9 @@
 {
   "build": {
     "beforeDevCommand": "",
-    "beforeBuildCommand": "npm run build",
+    "beforeBuildCommand": "",
     "devPath": "https://voxera-peach.vercel.app",
-    "distDir": "../.next/standalone",
+    "distDir": "../dist",
     "withGlobalTauri": false
   },
   "package": {
@@ -47,7 +47,7 @@
     },
     "security": {
       "csp": null,
-      "dangerousDisableAssetCspModification": false
+      "dangerousDisableAssetCspModification": true
     },
     "windows": [
       {

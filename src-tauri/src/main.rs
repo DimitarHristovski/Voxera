@@ -44,7 +44,7 @@ async fn register_hotkey(
                     println!("⚠️ Failed to unminimize window: {:?}", e);
                 }
                 // Unmaximize if needed (to ensure window is visible)
-                if let Err(e) = window.unmaximize() {
+                if let Err(_e) = window.unmaximize() {
                     // Ignore error - window might not be maximized
                 }
                 // Bring to front and focus - this is critical for opening the app
@@ -150,10 +150,20 @@ fn main() {
                 api.prevent_close();
             }
         })
-        .setup(|_app| {
-            println!("✅ VOXERA app started - server is running");
+        .setup(|app| {
+            println!("✅ VOXERA app started - connecting to Vercel");
             println!("💡 Closing the window will hide it, but the server stays active");
             println!("💡 Use the hotkey (Control+Shift+A) to bring the window back");
+            
+            // Navigate to Vercel URL if window exists
+            // Note: Tauri should load from devPath automatically, but we ensure it here
+            if let Some(window) = app.get_window("main") {
+                let vercel_url = "https://voxera-peach.vercel.app";
+                println!("🌐 Ensuring connection to: {}", vercel_url);
+                // Use eval to navigate if needed (fallback)
+                let _ = window.eval(&format!("if (window.location.href !== '{}') {{ window.location.href = '{}'; }}", vercel_url, vercel_url));
+            }
+            
             Ok(())
         })
         .run(tauri::generate_context!())
