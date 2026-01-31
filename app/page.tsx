@@ -40,7 +40,8 @@ export default function Home() {
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [uiLanguage, setUiLanguage] = useState<SupportedLanguage>(getLanguage())
   const [hotkeyStatus, setHotkeyStatus] = useState<'idle' | 'registered' | 'failed'>('idle')
-  const [hotkey, setHotkey] = useState<string>('Shift+Q')
+  const [hotkey, setHotkey] = useState<string>('CommandOrControl+Shift+M')
+  const [hotkeyDisplay, setHotkeyDisplay] = useState<string>('Cmd+Shift+M')
   const [isListeningForWakeWord, setIsListeningForWakeWord] = useState(false)
   const [showTranscript, setShowTranscript] = useState(true)
   const [showOutput, setShowOutput] = useState(true)
@@ -297,14 +298,19 @@ export default function Home() {
               setEnrichmentUsage(undefined)
             } else {
               setMicrophonePermissionStatus('denied')
-              // Provide detailed error message with common issues
+              // Provide detailed error message for production builds only
               const isMac = typeof navigator !== 'undefined' && 
                 (navigator as any).platform?.toLowerCase().includes('mac')
-              const errorMsg = isMac
+              // Check if running in production build (not dev mode)
+              const isProduction = typeof window !== 'undefined' && 
+                !window.location.href.includes('localhost') && 
+                !window.location.href.includes('127.0.0.1')
+              
+              const errorMsg = isMac && isProduction
                 ? 'Microphone permission required. ' +
-                  'Common issues: (1) Permission granted to Terminal instead of VOXERA - build the app and grant permission to VOXERA. ' +
+                  'Common issues: (1) Permission granted to Terminal instead of VOXERA - grant permission to VOXERA. ' +
                   '(2) Need to relaunch - after granting permission, quit (Cmd+Q) and restart the app. ' +
-                  '(3) Check System Settings → Privacy & Security → Microphone. ' +
+                  '(3) Check System Settings → Privacy & Security → Microphone → Enable VOXERA. ' +
                   'See MICROPHONE_PERMISSIONS.md for details.'
                 : 'Microphone permission is required to record. ' +
                   'A permission dialog should appear - please click "Allow" or "Grant". ' +
@@ -315,9 +321,15 @@ export default function Home() {
             setMicrophonePermissionStatus('denied')
             const isMac = typeof navigator !== 'undefined' && 
               (navigator as any).platform?.toLowerCase().includes('mac')
-            const errorMsg = isMac
+            // Only show detailed instructions for production builds
+            const isProduction = typeof window !== 'undefined' && 
+              !window.location.href.includes('localhost') && 
+              !window.location.href.includes('127.0.0.1')
+            
+            const errorMsg = isMac && isProduction
               ? 'Microphone permission required. ' +
-                'Build the app (npm run tauri:build), grant permission to VOXERA (not Terminal), then quit and relaunch. ' +
+                'Grant permission to VOXERA: System Settings → Privacy & Security → Microphone → Enable VOXERA. ' +
+                'Then quit the app (Cmd+Q) and relaunch. ' +
                 'See MICROPHONE_PERMISSIONS.md for troubleshooting.'
               : 'Microphone permission required. ' +
                 'Please grant microphone access when the dialog appears, or check your system settings. ' +
@@ -461,9 +473,16 @@ export default function Home() {
         import('@tauri-apps/api/tauri'),
         import('@tauri-apps/api/event')
       ]).then(async ([{ invoke }, { listen }]) => {
-        // Register hotkey: Shift+Q (all platforms)
-        const platformHotkey = 'Shift+Q'
+        // Register hotkey: CommandOrControl+Shift+M (works on all platforms)
+        // Tauri maps CommandOrControl to Cmd on macOS, Ctrl on Windows/Linux
+        const platformHotkey = 'CommandOrControl+Shift+M'
         setHotkey(platformHotkey)
+        
+        // Set display version based on platform
+        const isMac = typeof navigator !== 'undefined' && 
+          (navigator as any).platform?.toLowerCase().includes('mac')
+        setHotkeyDisplay(isMac ? 'Cmd+Shift+M' : 'Ctrl+Shift+M')
+        
         console.log('🔧 Attempting to register hotkey:', platformHotkey)
         
         // Function to register the hotkey
@@ -876,7 +895,7 @@ export default function Home() {
             <Video className="w-4 h-4 text-slate-100" />
             <span className="text-sm text-slate-100 font-medium">{t('press')}</span>
             <kbd className="px-3 py-1.5 bg-white/40 backdrop-blur-sm text-white rounded-lg text-xs md:text-sm font-mono font-bold border border-white/50 shadow-md">
-              Shift+Q
+              {hotkeyDisplay}
             </kbd>
             <span className="text-sm text-slate-100 font-medium">{t('toActivate')}</span>
             <span className="text-xs text-slate-200/80 ml-2">({t('orSay')} "Hey Voxera" {t('toRecord')})</span>
@@ -1258,7 +1277,7 @@ export default function Home() {
                       <h4 className="font-semibold text-slate-800 mb-1">{t('activateWindow')}</h4>
                       <p className="text-sm text-slate-600 mb-2">{t('activateWindowDesc')}</p>
                       <kbd className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono text-slate-700">
-                        Shift+Q
+                        {hotkeyDisplay}
                       </kbd>
                     </div>
                     <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
@@ -1304,7 +1323,7 @@ export default function Home() {
                   <div className="p-4 bg-green-50 rounded-xl border border-green-200">
                     <p className="text-sm text-green-800 font-medium">
                       ✅ {t('hotkeyRegistered')}: <kbd className="px-2 py-1 bg-white border border-green-300 rounded text-xs font-mono ml-1">
-                        Shift+Q
+                        {hotkeyDisplay}
                       </kbd>
                     </p>
                   </div>

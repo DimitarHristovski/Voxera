@@ -14,7 +14,7 @@ async fn register_hotkey(
     let app_handle = window.app_handle();
     
     // Check if this is the default hotkey that was registered at startup
-    let default_hotkey = "Shift+Q";
+    let default_hotkey = "CommandOrControl+Shift+M";
     
     if shortcut == default_hotkey {
         println!("🔧 Frontend requesting default hotkey registration: {}", shortcut);
@@ -157,7 +157,7 @@ fn main() {
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     println!("🪟 Window close requested - hiding window instead of quitting");
                     println!("🔄 App will continue running in the background");
-                    println!("💡 Press Shift+Q to bring the window back");
+                    println!("💡 Press Cmd+Shift+M (Mac) or Ctrl+Shift+M (Windows/Linux) to bring the window back");
                     let _ = event.window().hide();
                     api.prevent_close();
                 }
@@ -175,7 +175,7 @@ fn main() {
             // Register hotkey immediately at app startup so it works even when window is hidden
             // This registration persists and won't be overwritten by frontend registration
             let app_handle = app.app_handle();
-            let default_hotkey = "Shift+Q";
+            let default_hotkey = "CommandOrControl+Shift+M";
             
             println!("🔧 Registering hotkey: {}", default_hotkey);
             

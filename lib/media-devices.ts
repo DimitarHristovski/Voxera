@@ -304,13 +304,19 @@ export async function getUserMedia(
           ? (navigator as any).platform.toLowerCase() 
           : 'unknown'
         
+        // Only provide detailed instructions for production builds
+        const isProduction = typeof window !== 'undefined' && 
+          !window.location.href.includes('localhost') && 
+          !window.location.href.includes('127.0.0.1')
+        
         let instructions = 'Microphone permission is required. Please grant access:\n\n'
         
-        if (platform.includes('mac')) {
-          instructions += 'macOS:\n'
-          instructions += '1. System Preferences → Security & Privacy → Microphone\n'
-          instructions += '2. Enable access for Terminal/IDE or the app\n'
-          instructions += '3. Click the record button again to retry\n'
+        if (platform.includes('mac') && isProduction) {
+          instructions += 'macOS (Production Build):\n'
+          instructions += '1. System Settings → Privacy & Security → Microphone\n'
+          instructions += '2. Enable access for VOXERA (not Terminal)\n'
+          instructions += '3. After granting, quit the app (Cmd+Q) and relaunch\n'
+          instructions += '4. Click the record button again to retry\n'
         } else if (platform.includes('win')) {
           instructions += 'Windows:\n'
           instructions += '1. Settings → Privacy → Microphone\n'
