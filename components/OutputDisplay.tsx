@@ -756,12 +756,14 @@ export default function OutputDisplay({ output, onCopy, onOutputChange, onClose 
               {voices.length === 0 ? (
                 <option value="">{t('loadingVoices')}</option>
               ) : (
-                voices.map((voice) => {
+                voices.map((voice, index) => {
                   // Show language name for better UX
                   const langCode = voice.lang.split('-')[0]
                   const langName = new Intl.DisplayNames(['en'], { type: 'language' }).of(langCode) || langCode
+                  // Use voiceURI as key (unique identifier) or fallback to index if not available
+                  const uniqueKey = voice.voiceURI || `${voice.name}-${voice.lang}-${index}`
                   return (
-                    <option key={voice.name} value={voice.name}>
+                    <option key={uniqueKey} value={voice.name}>
                       {voice.name} - {langName} ({voice.lang})
                     </option>
                   )

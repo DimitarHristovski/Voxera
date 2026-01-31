@@ -3,7 +3,8 @@
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
     "devPath": "http://localhost:3000",
-    "distDir": "../.next/standalone"
+    "distDir": "../.next/standalone",
+    "withGlobalTauri": false
   },
   "package": {
     "productName": "VOXERA",
@@ -45,7 +46,8 @@
       ]
     },
     "security": {
-      "csp": null
+      "csp": null,
+      "dangerousDisableAssetCspModification": false
     },
     "windows": [
       {

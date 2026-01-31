@@ -96,6 +96,18 @@ The core pipeline follows a deterministic flow:
    - Any other OpenAI-compatible server
 
 3. **Run in development mode**:
+
+   **Option A: Server runs independently (recommended)**:
+   ```bash
+   # Terminal 1: Start the server (runs independently)
+   npm run server:dev
+   
+   # Terminal 2: Start the Tauri app (connects to existing server)
+   npm run tauri:dev
+   ```
+   The server will continue running even if you quit the Tauri app!
+
+   **Option B: Traditional mode** (server stops when app quits):
    ```bash
    npm run tauri:dev
    ```
@@ -106,9 +118,21 @@ The core pipeline follows a deterministic flow:
 
 4. **Build for production**:
    ```bash
+   npm run build
    npm run tauri:build
    ```
    Outputs platform-specific installers in `src-tauri/target/release/bundle/`
+
+5. **Run production server independently**:
+   ```bash
+   # Start the standalone server (runs independently)
+   npm run server:start
+   
+   # Then run the built Tauri app
+   # The server will continue running even if you quit the app!
+   ```
+   
+   See `SERVER_SETUP.md` for detailed server setup instructions.
 
 ### First Run
 
@@ -128,6 +152,7 @@ The core pipeline follows a deterministic flow:
 - **Window lifecycle**: Hotkey shows and focuses the window, then triggers recording
 - **Native integration**: Tauri provides access to OS-level features without web limitations
 - **Standalone execution**: App runs independently, not in a browser
+- **Always-on server**: The Next.js server runs continuously - closing the window hides it but keeps the server active. Use the hotkey to bring the window back.
 
 ### Security: Server-Side API Calls
 

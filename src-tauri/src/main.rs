@@ -1,7 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-use tauri::{Manager, Window, AppHandle};
+use tauri::{Manager, Window, GlobalShortcutManager};
 
 // Tauri command to register global hotkeys
 // Desktop-first: Hotkey activates/shows the window AND toggles recording
@@ -13,46 +13,67 @@ async fn register_hotkey(
 ) -> Result<String, String> {
     let app_handle = window.app_handle();
     
+    // Unregister the hotkey first if it's already registered (handles hot reload scenarios)
+    let _ = app_handle.global_shortcut_manager().unregister(&shortcut);
+    
     // Register global shortcut using global_shortcut_manager
     // Default: Control+A (all platforms)
     // Desktop-first behavior: Show window, bring to front, AND toggle recording
-    let shortcut_clone = shortcut.clone();
+    let shortcut_for_closure = shortcut.clone();
+    let shortcut_for_error = shortcut.clone();
+    let app_handle_clone = app_handle.clone();
+    
     app_handle
         .global_shortcut_manager()
-        .register(&shortcut, move |_app: AppHandle, _shortcut, event| {
-            if event.state == tauri::global_shortcut::ShortcutState::Pressed {
-                println!("🔥 Hotkey pressed: {}", _shortcut);
-                // Show window and bring to front
-                // Try different window labels
-                let window = _app.get_window("main")
-                    .or_else(|| _app.get_window("voxera"))
-                    .or_else(|| _app.windows().values().next().cloned());
-                
-                if let Some(window) = window {
-                    println!("✅ Window found, showing and focusing");
-                    // Ensure window is visible and on top
-                    let _ = window.show();
-                    let _ = window.unminimize(); // Unminimize if minimized
-                    let _ = window.set_focus(); // Bring to front and focus
-                    // Small delay to ensure window is visible before emitting event
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    // Emit event to notify frontend that hotkey was pressed (for window activation)
-                    match window.emit("hotkey-activated", ()) {
-                        Ok(_) => println!("✅ Window activated via hotkey, event emitted"),
-                        Err(e) => println!("❌ Failed to emit hotkey-activated event: {:?}", e),
-                    }
-                    // Also emit toggle-recording event to start/stop recording
-                    match window.emit("toggle-recording", ()) {
-                        Ok(_) => println!("✅ Toggle recording event emitted via hotkey"),
-                        Err(e) => println!("❌ Failed to emit toggle-recording event: {:?}", e),
-                    }
-                } else {
-                    println!("❌ No window found! Available windows: {:?}", _app.windows().keys().collect::<Vec<_>>());
+        .register(&shortcut, move || {
+            println!("🔥 Hotkey pressed: {}", shortcut_for_closure);
+            // Show window and bring to front
+            // Try different window labels
+            let window = app_handle_clone.get_window("main")
+                .or_else(|| app_handle_clone.get_window("voxera"))
+                .or_else(|| app_handle_clone.windows().values().next().cloned());
+            
+            if let Some(window) = window {
+                println!("✅ Window found, opening and focusing");
+                // First, ensure window is shown (this opens it if hidden)
+                if let Err(e) = window.show() {
+                    println!("⚠️ Failed to show window: {:?}", e);
                 }
+                // Unminimize if minimized
+                if let Err(e) = window.unminimize() {
+                    println!("⚠️ Failed to unminimize window: {:?}", e);
+                }
+                // Unmaximize if needed (to ensure window is visible)
+                if let Err(e) = window.unmaximize() {
+                    // Ignore error - window might not be maximized
+                }
+                // Bring to front and focus - this is critical for opening the app
+                if let Err(e) = window.set_focus() {
+                    println!("⚠️ Failed to set focus: {:?}", e);
+                }
+                // Also try maximize then restore to ensure window is visible
+                let _ = window.maximize();
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                let _ = window.unmaximize();
+                // Small delay to ensure window is visible before emitting event
+                std::thread::sleep(std::time::Duration::from_millis(100));
+                println!("✅ Window opened and focused via hotkey");
+                // Emit event to notify frontend that hotkey was pressed (for window activation)
+                match window.emit("hotkey-activated", ()) {
+                    Ok(_) => println!("✅ Window activated via hotkey, event emitted"),
+                    Err(e) => println!("❌ Failed to emit hotkey-activated event: {:?}", e),
+                }
+                // Also emit toggle-recording event to start/stop recording
+                match window.emit("toggle-recording", ()) {
+                    Ok(_) => println!("✅ Toggle recording event emitted via hotkey"),
+                    Err(e) => println!("❌ Failed to emit toggle-recording event: {:?}", e),
+                }
+            } else {
+                println!("❌ No window found! Available windows: {:?}", app_handle_clone.windows().keys().collect::<Vec<_>>());
             }
         })
         .map_err(|e| {
-            let error_msg = format!("Failed to register hotkey '{}': {}", shortcut_clone, e);
+            let error_msg = format!("Failed to register hotkey '{}': {}", shortcut_for_error, e);
             println!("❌ Hotkey registration error: {}", error_msg);
             error_msg
         })?;
@@ -95,11 +116,12 @@ async fn test_hotkey(window: Window) -> Result<String, String> {
     // Try to register a test hotkey to verify the system works
     let app_handle = window.app_handle();
     let test_shortcut = "Control+Shift+T"; // Different from main hotkey to avoid conflicts
+    let app_handle_clone = app_handle.clone();
     
     app_handle
         .global_shortcut_manager()
-        .register(&test_shortcut, move |_app: AppHandle, _shortcut, _event| {
-            if let Some(window) = _app.get_window("main") {
+        .register(&test_shortcut, move || {
+            if let Some(window) = app_handle_clone.get_window("main") {
                 let _ = window.emit("hotkey-test", "Test hotkey works!");
             }
         })
@@ -117,14 +139,23 @@ fn main() {
             get_platform,
             test_hotkey
         ])
-        // Desktop-first: Handle window close to hide instead of quit (optional)
-        // Uncomment if you want window to hide on close instead of quitting:
-        // .on_window_event(|event| {
-        //     if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
-        //         event.window().hide().unwrap();
-        //         api.prevent_close();
-        //     }
-        // })
+        // Desktop-first: Handle window close to hide instead of quit
+        // This keeps the app running in the background so the server stays alive
+        // Users can bring the window back using the hotkey (Control+Shift+A)
+        .on_window_event(|event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
+                println!("🪟 Window close requested - hiding window instead of quitting");
+                println!("🔄 Server will continue running in the background");
+                let _ = event.window().hide();
+                api.prevent_close();
+            }
+        })
+        .setup(|_app| {
+            println!("✅ VOXERA app started - server is running");
+            println!("💡 Closing the window will hide it, but the server stays active");
+            println!("💡 Use the hotkey (Control+Shift+A) to bring the window back");
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

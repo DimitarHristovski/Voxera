@@ -83,7 +83,9 @@ export class WakeWordDetector {
       
       // Handle different error types
       if (error === 'not-allowed' || error === 'service-not-allowed') {
-        console.error('❌ Microphone permission denied - wake word detection disabled')
+        console.warn('⚠️ Microphone permission denied - wake word detection disabled')
+        console.warn('💡 Grant microphone permission to enable wake word detection')
+        console.warn('💡 You can still use the record button or hotkey to start recording')
         this.isListening = false
         this.recognition = null
         return

@@ -10,6 +10,12 @@ import Statistics from '@/components/Statistics'
 import { AudioRecorder } from '@/lib/audio-recorder'
 import { WakeWordDetector } from '@/lib/wake-word-detector'
 import { t, setLanguage, getLanguage, type SupportedLanguage } from '@/lib/i18n'
+import { requestMicrophonePermission, isMediaDevicesAvailable, initializeMediaDevicesPolyfill } from '@/lib/media-devices'
+
+// Initialize MediaDevices polyfill immediately on client-side
+if (typeof window !== 'undefined') {
+  initializeMediaDevicesPolyfill()
+}
 
 type PipelineState = 'idle' | 'recording' | 'transcribing' | 'enriching' | 'complete'
 
@@ -31,16 +37,16 @@ export default function Home() {
   const [detectedMode, setDetectedMode] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [enrichmentUsage, setEnrichmentUsage] = useState<{ promptTokens: number; completionTokens: number; totalTokens: number; model: string } | undefined>(undefined)
-  const [hotkey, setHotkey] = useState<string>('Control+A')
-  const [hotkeyStatus, setHotkeyStatus] = useState<'idle' | 'registered' | 'failed'>('idle')
   const [recordingDuration, setRecordingDuration] = useState(0)
   const [uiLanguage, setUiLanguage] = useState<SupportedLanguage>(getLanguage())
+  const [hotkeyStatus, setHotkeyStatus] = useState<'idle' | 'registered' | 'failed'>('idle')
   const [isListeningForWakeWord, setIsListeningForWakeWord] = useState(false)
   const [showTranscript, setShowTranscript] = useState(true)
   const [showOutput, setShowOutput] = useState(true)
   const [showHelp, setShowHelp] = useState(false)
   const [showNameInput, setShowNameInput] = useState(false)
   const [userName, setUserName] = useState<string>('')
+  const [microphonePermissionStatus, setMicrophonePermissionStatus] = useState<'unknown' | 'granted' | 'denied' | 'prompting'>('unknown')
   const audioRecorderRef = useRef<AudioRecorder | null>(null)
   const recordingIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const wakeWordDetectorRef = useRef<WakeWordDetector | null>(null)
@@ -191,7 +197,7 @@ export default function Home() {
     }
   }, [enrichmentUsage])
 
-  // Separate function to start recording (used by wake word and hotkey)
+  // Separate function to start recording (used by wake word and button click)
   const handleStartRecording = useCallback(async () => {
     // Prevent starting if already recording
     if (isRecording) {
@@ -207,10 +213,33 @@ export default function Home() {
     }
 
     try {
+      // Explicitly request permission first - this will show the permission dialog
+      console.log('🎤 Requesting microphone permission before recording...')
+      setMicrophonePermissionStatus('prompting')
+      
+      // Request permission with more attempts to ensure dialog appears
+      const permissionGranted = await requestMicrophonePermission(5)
+      
+      if (permissionGranted) {
+        setMicrophonePermissionStatus('granted')
+        console.log('✅ Permission granted, starting recording...')
+      } else {
+        setMicrophonePermissionStatus('denied')
+        console.warn('⚠️ Permission not granted yet')
+        // Don't fail immediately - try to start recording anyway
+        // The getUserMedia call in AudioRecorder will also request permission
+        console.warn('💡 Attempting to start recording - permission dialog may appear...')
+      }
+
       if (!audioRecorderRef.current) {
         audioRecorderRef.current = new AudioRecorder()
       }
+      
+      console.log('🎙️ Starting audio recording (this will also request permission if needed)...')
       await audioRecorderRef.current.start()
+      
+      // If we get here, permission was granted
+      setMicrophonePermissionStatus('granted')
       setIsRecording(true)
       setPipelineState('recording')
       setTranscript('')
@@ -235,36 +264,145 @@ export default function Home() {
       }
       // Duration will be reset by the useEffect when isRecording becomes true
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start recording')
-      setPipelineState('idle')
-      // Restart wake word detection if recording failed
-      setTimeout(() => {
-        if (wakeWordDetectorRef.current && !wakeWordDetectorRef.current.isActive()) {
+      const errorMessage = err instanceof Error ? err.message : 'Failed to start recording'
+      
+      // If it's a permission error, try one more time automatically
+      if (errorMessage.includes('permission') || errorMessage.includes('denied')) {
+        setMicrophonePermissionStatus('denied')
+        console.log('🔄 Permission error detected, retrying permission request...')
+        
+        // Try requesting permission one more time with a delay
+        setTimeout(async () => {
           try {
-            wakeWordDetectorRef.current.start()
-            setIsListeningForWakeWord(true)
-          } catch (error) {
-            console.error('Failed to restart wake word detection:', error)
+            console.log('🔄 Retrying microphone permission request...')
+            setMicrophonePermissionStatus('prompting')
+            const retryGranted = await requestMicrophonePermission(3)
+            
+            if (retryGranted) {
+              console.log('✅ Permission granted on retry! Starting recording...')
+              setMicrophonePermissionStatus('granted')
+              setError(null)
+              // Try starting recording again
+              if (!audioRecorderRef.current) {
+                audioRecorderRef.current = new AudioRecorder()
+              }
+              await audioRecorderRef.current.start()
+              setIsRecording(true)
+              setPipelineState('recording')
+              setTranscript('')
+              setEnrichedOutput('')
+              setDetectedMode(null)
+              setError(null)
+              setEnrichmentUsage(undefined)
+            } else {
+              setMicrophonePermissionStatus('denied')
+              // Provide detailed error message with common issues
+              const isMac = typeof navigator !== 'undefined' && 
+                (navigator as any).platform?.toLowerCase().includes('mac')
+              const errorMsg = isMac
+                ? 'Microphone permission required. ' +
+                  'Common issues: (1) Permission granted to Terminal instead of VOXERA - build the app and grant permission to VOXERA. ' +
+                  '(2) Need to relaunch - after granting permission, quit (Cmd+Q) and restart the app. ' +
+                  '(3) Check System Settings → Privacy & Security → Microphone. ' +
+                  'See MICROPHONE_PERMISSIONS.md for details.'
+                : 'Microphone permission is required to record. ' +
+                  'A permission dialog should appear - please click "Allow" or "Grant". ' +
+                  'If no dialog appears, check your system settings and grant microphone access, then click the record button again.'
+              setError(errorMsg)
+            }
+          } catch (retryError) {
+            setMicrophonePermissionStatus('denied')
+            const isMac = typeof navigator !== 'undefined' && 
+              (navigator as any).platform?.toLowerCase().includes('mac')
+            const errorMsg = isMac
+              ? 'Microphone permission required. ' +
+                'Build the app (npm run tauri:build), grant permission to VOXERA (not Terminal), then quit and relaunch. ' +
+                'See MICROPHONE_PERMISSIONS.md for troubleshooting.'
+              : 'Microphone permission required. ' +
+                'Please grant microphone access when the dialog appears, or check your system settings. ' +
+                'Click the record button again to retry.'
+            setError(errorMsg)
           }
-        }
-      }, 1000)
+        }, 1000)
+      } else {
+        setError(errorMessage)
+      }
+      
+      setPipelineState('idle')
+      
+      // Restart wake word detection if recording failed (but not for permission errors)
+      if (!errorMessage.includes('permission') && !errorMessage.includes('denied')) {
+        setTimeout(() => {
+          if (wakeWordDetectorRef.current && !wakeWordDetectorRef.current.isActive()) {
+            try {
+              wakeWordDetectorRef.current.start()
+              setIsListeningForWakeWord(true)
+            } catch (error) {
+              console.error('Failed to restart wake word detection:', error)
+            }
+          }
+        }, 1000)
+      }
     }
   }, [isRecording])
 
-  // Initialize wake word detector
+  // Initialize wake word detector and request permissions automatically
   useEffect(() => {
-    // Request microphone permission first
+    // Initialize MediaDevices polyfill on mount
+    if (typeof window !== 'undefined') {
+      initializeMediaDevicesPolyfill()
+    }
+
+    // Automatically request microphone permission on app startup
+    // This will trigger the system permission dialog
+    const requestPermissionsOnStartup = async () => {
+      try {
+        if (isMediaDevicesAvailable()) {
+          console.log('🎤 Automatically requesting microphone permission on startup...')
+          console.log('📢 A permission dialog should appear - please grant microphone access')
+          // Request permission - this will show the permission dialog
+          const granted = await requestMicrophonePermission(5)
+          if (granted) {
+            console.log('✅ Microphone permission granted on startup')
+          } else {
+            console.log('⚠️ Microphone permission not granted yet')
+            console.log('💡 Permission will be requested again when you click the record button')
+          }
+        } else {
+          console.warn('⚠️ MediaDevices API not available - cannot request permission')
+        }
+      } catch (error) {
+        console.warn('Could not request microphone permission on startup:', error)
+      }
+    }
+
+    // Request permissions after a short delay to ensure app is fully loaded
+    // Give the webview time to initialize
+    const permissionTimeout = setTimeout(() => {
+      requestPermissionsOnStartup()
+    }, 2000) // Increased delay to ensure webview is ready
+
+    // Request microphone permission for wake word detector
     const initializeWakeWordDetector = async () => {
       try {
-        // Request microphone permission
-        try {
-          await navigator.mediaDevices.getUserMedia({ audio: true })
-          console.log('✅ Microphone permission granted')
-        } catch (permError) {
-          console.warn('❌ Microphone permission not granted:', permError)
+        // Check if mediaDevices API is available
+        if (!isMediaDevicesAvailable()) {
+          console.warn('❌ MediaDevices API is not available. Wake word detection disabled.')
           setIsListeningForWakeWord(false)
           return
         }
+
+        // Request microphone permission using the robust utility (with automatic retries)
+        // Use fewer attempts here since we'll retry when user clicks record
+        const permissionGranted = await requestMicrophonePermission(3)
+        if (!permissionGranted) {
+          console.warn('⚠️ Microphone permission not granted yet. Wake word detection disabled.')
+          console.warn('💡 Permission will be requested automatically when you click the record button')
+          setIsListeningForWakeWord(false)
+          // Don't return - allow the app to continue, permission can be granted later
+          return
+        }
+        console.log('✅ Microphone permission granted')
 
         // Small delay to ensure permission is fully processed
         await new Promise(resolve => setTimeout(resolve, 500))
@@ -302,6 +440,7 @@ export default function Home() {
     }
 
     return () => {
+      clearTimeout(permissionTimeout)
       if (wakeWordDetectorRef.current) {
         wakeWordDetectorRef.current.stop()
       }
@@ -321,65 +460,28 @@ export default function Home() {
         import('@tauri-apps/api/tauri'),
         import('@tauri-apps/api/event')
       ]).then(async ([{ invoke }, { listen }]) => {
-        // Detect platform and use appropriate hotkey
-        // macOS uses Command, Windows/Linux use Control
-        let primaryHotkey: string
-        let alternativeHotkeys: string[]
+        // Register hotkey: Ctrl+Shift+A (all platforms)
+        const hotkey = 'Control+Shift+A'
+        console.log('🔧 Attempting to register hotkey:', hotkey)
         
-        try {
-          // Try to detect platform via Tauri
-          const platform = await invoke('get_platform', {}).catch(() => null)
-          const isMac = platform === 'darwin' || navigator.platform.toUpperCase().includes('MAC')
-          
-          if (isMac) {
-            // macOS: Use Command instead of Control
-            primaryHotkey = 'Command+Shift+V'
-            alternativeHotkeys = ['Command+Shift+X', 'Command+Alt+V', 'Command+Control+V']
-            console.log('🍎 Detected macOS, using Command-based hotkeys')
-          } else {
-            // Windows/Linux: Use Control
-            primaryHotkey = 'Control+Shift+V'
-            alternativeHotkeys = ['Control+Shift+X', 'Control+Alt+V', 'Alt+Shift+V']
-            console.log('🪟 Detected Windows/Linux, using Control-based hotkeys')
-          }
-        } catch (e) {
-          // Fallback: try to detect from user agent
-          const isMac = navigator.platform.toUpperCase().includes('MAC')
-          if (isMac) {
-            primaryHotkey = 'Command+Shift+V'
-            alternativeHotkeys = ['Command+Shift+X', 'Command+Alt+V']
-          } else {
-            primaryHotkey = 'Control+Shift+V'
-            alternativeHotkeys = ['Control+Shift+X', 'Control+Alt+V']
-          }
-          console.log('⚠️ Could not detect platform via Tauri, using fallback detection')
-        }
-        
-        console.log('🔧 Attempting to register hotkey:', primaryHotkey)
-        
-        // Function to try registering a hotkey
-        const tryRegisterHotkey = async (hotkey: string, isPrimary: boolean = true): Promise<boolean> => {
+        // Function to register the hotkey
+        const registerHotkey = async (): Promise<boolean> => {
           try {
             const result = await invoke('register_hotkey', { shortcut: hotkey })
-            console.log(`✅ Hotkey registration successful (${isPrimary ? 'primary' : 'fallback'}):`, result)
-            setHotkey(hotkey)
+            console.log('✅ Hotkey registration successful:', result)
             setHotkeyStatus('registered')
             console.log('💡 Press', hotkey, 'to activate the window and toggle recording')
             return true
           } catch (err: any) {
             const errorMsg = err?.toString() || JSON.stringify(err)
             console.error(`❌ Failed to register hotkey '${hotkey}':`, errorMsg)
-            
-            // Check if it's a conflict error
-            if (errorMsg.includes('already registered') || errorMsg.includes('conflict') || errorMsg.includes('permission')) {
-              console.warn(`⚠️ Hotkey '${hotkey}' is blocked or already in use`)
-            }
+            setHotkeyStatus('failed')
+            console.warn('⚠️ Hotkey registration failed. App will work with button clicks and wake word.')
             return false
           }
         }
 
-        // Listen for hotkey activation events FIRST
-        // Hotkey activates the window AND toggles recording for seamless workflow integration
+        // Set up event listeners for hotkey activation
         const setupListener = async () => {
           try {
             console.log('🔧 Setting up hotkey event listeners...')
@@ -389,7 +491,7 @@ export default function Home() {
               console.log('🔔 Hotkey activated event received:', event)
               console.log('✅ Window activated via hotkey')
               
-              // Double-check window is visible (frontend can also help ensure visibility)
+              // Ensure window is visible
               if (isTauriAvailable()) {
                 try {
                   const { appWindow } = await import('@tauri-apps/api/window')
@@ -408,7 +510,6 @@ export default function Home() {
               console.log('🔔 Toggle recording event received via hotkey:', event)
               console.log('🔄 Attempting to toggle recording...')
               // Toggle recording when hotkey is pressed
-              // Use ref to get the latest function
               if (handleToggleRecordingRef.current) {
                 console.log('✅ handleToggleRecording found, calling...')
                 try {
@@ -419,7 +520,6 @@ export default function Home() {
                 }
               } else {
                 console.warn('⚠️ handleToggleRecording not available yet - ref is null')
-                console.warn('⚠️ This might happen if the component is still initializing')
               }
             })
             console.log('✅ toggle-recording listener registered')
@@ -431,53 +531,19 @@ export default function Home() {
               unlistenToggle()
             }
             console.log('✅ Hotkey activation and toggle recording listeners set up successfully')
-            console.log('💡 Hotkey listeners are ready. Press the registered hotkey to test.')
+            
+            // Register the hotkey after listeners are ready
+            await registerHotkey()
           } catch (err) {
             console.error('❌ Failed to set up hotkey listeners:', err)
-            console.error('Error details:', JSON.stringify(err, null, 2))
             if (err instanceof Error) {
               console.error('Error stack:', err.stack)
             }
+            setHotkeyStatus('failed')
           }
         }
         
-        // Set up listeners BEFORE trying to register hotkey
-        // This ensures listeners are ready when hotkey is pressed
         await setupListener()
-        
-        // Now register the hotkey after listeners are ready
-        console.log('🔧 Starting hotkey registration process...')
-        
-        // Try primary hotkey first
-        tryRegisterHotkey(primaryHotkey, true)
-          .then((success) => {
-            if (!success) {
-              console.warn('⚠️ Primary hotkey failed. Trying alternatives...')
-              // Try alternatives one by one
-              let altIndex = 0
-              const tryNextAlternative = () => {
-                if (altIndex < alternativeHotkeys.length) {
-                  const altHotkey = alternativeHotkeys[altIndex]
-                  console.log(`🔄 Trying alternative hotkey: ${altHotkey}`)
-                  tryRegisterHotkey(altHotkey, false)
-                    .then((success) => {
-                      if (!success) {
-                        altIndex++
-                        tryNextAlternative()
-                      }
-                    })
-                } else {
-                  console.error('❌ All hotkey attempts failed')
-                  setHotkeyStatus('failed')
-                  console.warn('App will work with button clicks, but hotkey is unavailable')
-                  console.warn('💡 You may need to grant Accessibility permissions (macOS) or check system settings')
-                }
-              }
-              tryNextAlternative()
-            } else {
-              console.log('🎉 Hotkey registration complete! The app is ready to use.')
-            }
-          })
       }).catch(err => {
         console.error('Failed to load Tauri APIs:', err)
         setHotkeyStatus('failed')
@@ -676,12 +742,25 @@ export default function Home() {
         />
       </div>
 
-      {/* Language Selector */}
+      {/* Top Right Controls - Language Selector and Info Button */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="absolute top-4 right-4 z-20"
+        className="absolute top-4 right-4 z-20 flex items-center gap-3"
       >
+        {/* Info Button */}
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setShowHelp(!showHelp)}
+          className="w-10 h-10 flex items-center justify-center bg-white/90 hover:bg-white backdrop-blur-sm text-slate-700 rounded-xl border border-white/50 shadow-lg transition-all hover:shadow-xl"
+          aria-label="Information"
+          title="Show information"
+        >
+          <Info className="w-5 h-5" />
+        </motion.button>
+
+        {/* Language Selector */}
         <select
           value={uiLanguage}
           onChange={(e) => {
@@ -795,31 +874,10 @@ export default function Home() {
             <Video className="w-4 h-4 text-slate-100" />
             <span className="text-sm text-slate-100 font-medium">{t('press')}</span>
             <kbd className="px-3 py-1.5 bg-white/40 backdrop-blur-sm text-white rounded-lg text-xs md:text-sm font-mono font-bold border border-white/50 shadow-md">
-              {hotkey.replace('Command', 'Cmd').replace('Control', 'Ctrl').replace('Alt', 'Alt')}
+              Ctrl+Shift+A
             </kbd>
             <span className="text-sm text-slate-100 font-medium">{t('toActivate')}</span>
             <span className="text-xs text-slate-200/80 ml-2">({t('orSay')} "Hey Voxera" {t('toRecord')})</span>
-            {isListeningForWakeWord && !isRecording && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="ml-2 flex items-center gap-1.5 px-2 py-1 bg-blue-500/30 rounded-lg border border-blue-400/50"
-              >
-                <motion.div
-                  className="w-2 h-2 bg-blue-400 rounded-full"
-                  animate={{
-                    scale: [1, 1.3, 1],
-                    opacity: [1, 0.6, 1],
-                  }}
-                  transition={{
-                    duration: 1.5,
-                    repeat: Infinity,
-                  }}
-                />
-                <span className="text-xs text-blue-100 font-medium">Listening for "Hey Voxera"</span>
-              </motion.div>
-            )}
             <AnimatePresence>
               {hotkeyStatus === 'registered' && (
                 <motion.span
@@ -852,8 +910,67 @@ export default function Home() {
                 />
               )}
             </AnimatePresence>
+            {isListeningForWakeWord && !isRecording && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.8 }}
+                className="ml-2 flex items-center gap-1.5 px-2 py-1 bg-blue-500/30 rounded-lg border border-blue-400/50"
+              >
+                <motion.div
+                  className="w-2 h-2 bg-blue-400 rounded-full"
+                  animate={{
+                    scale: [1, 1.3, 1],
+                    opacity: [1, 0.6, 1],
+                  }}
+                  transition={{
+                    duration: 1.5,
+                    repeat: Infinity,
+                  }}
+                />
+                <span className="text-xs text-blue-100 font-medium">Listening for "Hey Voxera"</span>
+              </motion.div>
+            )}
           </motion.div>
         </motion.div>
+
+        {/* Microphone Permission Status */}
+        {microphonePermissionStatus === 'denied' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 px-4 py-3 bg-yellow-500/20 border border-yellow-400/50 rounded-lg backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-yellow-300">⚠️</span>
+              <p className="text-sm text-yellow-100">
+                Microphone permission is required. Please grant access when prompted, or check your system settings.
+              </p>
+            </div>
+          </motion.div>
+        )}
+        {microphonePermissionStatus === 'prompting' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className="mb-4 px-4 py-3 bg-blue-500/20 border border-blue-400/50 rounded-lg backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2">
+              <motion.span
+                className="text-blue-300"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+              >
+                🎤
+              </motion.span>
+              <p className="text-sm text-blue-100">
+                Requesting microphone permission... Please allow access when prompted.
+              </p>
+            </div>
+          </motion.div>
+        )}
 
         {/* Status Indicator */}
         <motion.div
@@ -1079,6 +1196,130 @@ export default function Home() {
           )}
         </AnimatePresence>
       </div>
+
+      {/* Help/Info Modal */}
+      <AnimatePresence>
+        {showHelp && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
+            onClick={() => setShowHelp(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="bg-white/95 backdrop-blur-md rounded-2xl shadow-2xl border border-white/50 p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <Info className="w-6 h-6 text-white" />
+                  </div>
+                  <h2 className="text-2xl font-bold text-slate-800">{t('howItWorks')}</h2>
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.1, rotate: 90 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowHelp(false)}
+                  className="w-8 h-8 flex items-center justify-center text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-all"
+                  aria-label="Close"
+                >
+                  <X className="w-5 h-5" />
+                </motion.button>
+              </div>
+              
+              <div className="space-y-6 text-slate-700">
+                {/* Getting Started */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-2 flex items-center gap-2">
+                    <Lightbulb className="w-5 h-5 text-yellow-500" />
+                    {t('gettingStarted')}
+                  </h3>
+                  <p className="text-slate-600 leading-relaxed">
+                    {t('gettingStartedDesc')}
+                  </p>
+                </div>
+
+                {/* Ways to Record */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-3 flex items-center gap-2">
+                    <Mic className="w-5 h-5 text-blue-500" />
+                    {t('waysToRecord')}
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <h4 className="font-semibold text-slate-800 mb-1">{t('activateWindow')}</h4>
+                      <p className="text-sm text-slate-600 mb-2">{t('activateWindowDesc')}</p>
+                      <kbd className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-mono text-slate-700">
+                        Ctrl+Shift+A
+                      </kbd>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <h4 className="font-semibold text-slate-800 mb-1">Wake Word</h4>
+                      <p className="text-sm text-slate-600">{t('wakeWordDesc')}</p>
+                    </div>
+                    <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                      <h4 className="font-semibold text-slate-800 mb-1">{t('recordButton')}</h4>
+                      <p className="text-sm text-slate-600">{t('recordButtonDesc')}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Features */}
+                <div>
+                  <h3 className="text-lg font-bold text-slate-800 mb-3">Features</h3>
+                  <ul className="space-y-2 text-slate-600">
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>Automatic transcription with language detection</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>AI-powered enrichment and formatting</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>Text-to-speech playback</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>Translation to multiple languages</span>
+                    </li>
+                    <li className="flex items-start gap-2">
+                      <span className="text-blue-500 mt-1">•</span>
+                      <span>Usage statistics and cost tracking</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {/* Hotkey Status */}
+                {hotkeyStatus === 'registered' && (
+                  <div className="p-4 bg-green-50 rounded-xl border border-green-200">
+                    <p className="text-sm text-green-800 font-medium">
+                      ✅ {t('hotkeyRegistered')}: <kbd className="px-2 py-1 bg-white border border-green-300 rounded text-xs font-mono ml-1">
+                        Ctrl+Shift+A
+                      </kbd>
+                    </p>
+                  </div>
+                )}
+                {hotkeyStatus === 'failed' && (
+                  <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+                    <p className="text-sm text-yellow-800">
+                      ⚠️ {t('hotkeyFailed')}. The app will work with button clicks and wake word.
+                    </p>
+                  </div>
+                )}
+
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Name Input Modal */}
       <AnimatePresence>

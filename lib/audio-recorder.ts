@@ -5,6 +5,13 @@
  * Records audio and provides it as a Blob for transcription.
  */
 
+import { getUserMedia, initializeMediaDevicesPolyfill } from './media-devices'
+
+// Initialize polyfill on module load
+if (typeof window !== 'undefined') {
+  initializeMediaDevicesPolyfill()
+}
+
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null
   private audioChunks: Blob[] = []
@@ -12,13 +19,18 @@ export class AudioRecorder {
 
   async start(): Promise<void> {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 44100,
+      // Use the robust getUserMedia implementation with retry logic
+      // Increased retries and wait timeout for better permission handling
+      const stream = await getUserMedia(
+        {
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            sampleRate: 44100,
+          },
         },
-      })
+        { retries: 5, retryDelay: 1500, waitTimeout: 10000 } // More retries for permission requests
+      )
 
       this.stream = stream
       this.audioChunks = []
