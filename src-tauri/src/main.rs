@@ -143,30 +143,95 @@ fn main() {
         // This keeps the app running in the background so the server stays alive
         // Users can bring the window back using the hotkey (Control+Shift+A)
         .on_window_event(|event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event.event() {
-                println!("🪟 Window close requested - hiding window instead of quitting");
-                println!("🔄 Server will continue running in the background");
-                let _ = event.window().hide();
-                api.prevent_close();
+            match event.event() {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    println!("🪟 Window close requested - hiding window instead of quitting");
+                    println!("🔄 App will continue running in the background");
+                    println!("💡 Use hotkey (Control+Shift+A) to bring the window back");
+                    let _ = event.window().hide();
+                    api.prevent_close();
+                }
+                _ => {}
             }
         })
         .setup(|app| {
             println!("✅ VOXERA app started - connecting to Vercel");
-            println!("💡 Closing the window will hide it, but the server stays active");
+            println!("💡 Closing the window will hide it, but the app stays running");
             println!("💡 Use the hotkey (Control+Shift+A) to bring the window back");
+            println!("💡 The app will continue running in the background even when window is closed");
             
-            // Navigate to Vercel URL if window exists
-            // Note: Tauri should load from devPath automatically, but we ensure it here
+            // Navigate to Vercel URL - use multiple methods to ensure it works
+            let vercel_url = "https://voxera-peach.vercel.app";
             if let Some(window) = app.get_window("main") {
-                let vercel_url = "https://voxera-peach.vercel.app";
-                println!("🌐 Ensuring connection to: {}", vercel_url);
-                // Use eval to navigate if needed (fallback)
-                let _ = window.eval(&format!("if (window.location.href !== '{}') {{ window.location.href = '{}'; }}", vercel_url, vercel_url));
+                println!("🌐 Navigating to: {}", vercel_url);
+                
+                // Method 1: Immediate aggressive navigation
+                let nav_script = format!(
+                    r#"
+                    (function() {{
+                        const targetUrl = '{}';
+                        console.log('Current URL:', window.location.href);
+                        console.log('Target URL:', targetUrl);
+                        
+                        // Force immediate navigation
+                        try {{
+                            window.location.replace(targetUrl);
+                        }} catch(e) {{
+                            console.error('Replace failed:', e);
+                            window.location.href = targetUrl;
+                        }}
+                    }})();
+                    "#,
+                    vercel_url
+                );
+                
+                // Execute immediately
+                if let Err(e) = window.eval(&nav_script) {
+                    println!("⚠️ Failed to navigate via eval: {:?}", e);
+                } else {
+                    println!("✅ Navigation script executed");
+                }
+                
+                // Method 2: Multiple delayed attempts to ensure navigation
+                let window_clone1 = window.clone();
+                let window_clone2 = window.clone();
+                let window_clone3 = window.clone();
+                
+                // Attempt 1: After 200ms
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(200));
+                    let script = format!(r#"window.location.replace('{}');"#, vercel_url);
+                    if let Err(e) = window_clone1.eval(&script) {
+                        println!("⚠️ Delayed navigation 1 failed: {:?}", e);
+                    }
+                });
+                
+                // Attempt 2: After 500ms
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    let script = format!(r#"if (!window.location.href.includes('voxera-peach.vercel.app')) {{ window.location.href = '{}'; }}"#, vercel_url);
+                    if let Err(e) = window_clone2.eval(&script) {
+                        println!("⚠️ Delayed navigation 2 failed: {:?}", e);
+                    }
+                });
+                
+                // Attempt 3: After 1000ms (last resort)
+                std::thread::spawn(move || {
+                    std::thread::sleep(std::time::Duration::from_millis(1000));
+                    let script = format!(r#"window.top.location.href = '{}';"#, vercel_url);
+                    if let Err(e) = window_clone3.eval(&script) {
+                        println!("⚠️ Delayed navigation 3 failed: {:?}", e);
+                    }
+                });
             }
             
             Ok(())
         })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+        
+    // Note: In Tauri v1, we handle quit prevention in on_window_event
+    // The app will stay running as long as at least one window exists (even if hidden)
+    // To fully quit, users need to use Force Quit or kill the process
 }
 
