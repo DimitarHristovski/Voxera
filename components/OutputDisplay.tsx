@@ -88,30 +88,155 @@ export default function OutputDisplay({ output, onCopy, onOutputChange, onClose 
   }, [output])
 
   useEffect(() => {
-    // Load available voices - filter for Google voices only
+    // Load available voices - prefer Google voices, fallback to others, 1 per language
     const loadVoices = () => {
       const allVoices = window.speechSynthesis.getVoices()
-      // Filter to only Google voices (names typically include "Google" or voiceURI contains "google")
+      
+      // Separate Google voices from other voices
       const googleVoices = allVoices.filter(voice => {
         const nameLower = voice.name.toLowerCase()
         const uriLower = voice.voiceURI.toLowerCase()
         return nameLower.includes('google') || uriLower.includes('google')
       })
       
-      // Use Google voices if available, otherwise use all voices (fallback)
-      const availableVoices = googleVoices.length > 0 ? googleVoices : allVoices
+      const otherVoices = allVoices.filter(voice => {
+        const nameLower = voice.name.toLowerCase()
+        const uriLower = voice.voiceURI.toLowerCase()
+        return !nameLower.includes('google') && !uriLower.includes('google')
+      })
       
-      setVoices(availableVoices)
+      // Filter to one voice per language (base language code, e.g., "en", "es", "fr")
+      // Prefer Google voices, but use other voices if Google voices aren't available for that language
+      const voicesByLanguage = new Map<string, SpeechSynthesisVoice>()
+      
+      // Helper function to check if a voice is Google
+      const isGoogleVoice = (voice: SpeechSynthesisVoice) => {
+        const nameLower = voice.name.toLowerCase()
+        const uriLower = voice.voiceURI.toLowerCase()
+        return nameLower.includes('google') || uriLower.includes('google')
+      }
+      
+      // Helper function to score voice quality (higher = better)
+      const getVoiceQualityScore = (voice: SpeechSynthesisVoice): number => {
+        let score = 0
+        const nameLower = voice.name.toLowerCase()
+        const uriLower = voice.voiceURI.toLowerCase()
+        
+        // Prefer Google voices (high quality, natural)
+        if (isGoogleVoice(voice)) score += 100
+        
+        // Prefer neural/enhanced voices (best quality)
+        if (nameLower.includes('neural') || uriLower.includes('neural')) score += 50
+        if (nameLower.includes('enhanced') || uriLower.includes('enhanced')) score += 40
+        if (nameLower.includes('premium') || uriLower.includes('premium')) score += 30
+        
+        // Prefer voices with region codes (more specific = usually better)
+        if (voice.lang.includes('-')) score += 20
+        
+        // Prefer certain high-quality voice providers
+        if (nameLower.includes('siri') || uriLower.includes('siri')) score += 25
+        if (nameLower.includes('samantha') || nameLower.includes('alex') || nameLower.includes('karen')) score += 15
+        
+        // Avoid low-quality indicators
+        if (nameLower.includes('basic') || nameLower.includes('compact')) score -= 10
+        if (nameLower.includes('old') || nameLower.includes('legacy')) score -= 20
+        
+        return score
+      }
+      
+      // Helper function to select best voice for a language
+      const selectBestVoice = (existing: SpeechSynthesisVoice | undefined, current: SpeechSynthesisVoice): SpeechSynthesisVoice => {
+        if (!existing) return current
+        
+        const existingScore = getVoiceQualityScore(existing)
+        const currentScore = getVoiceQualityScore(current)
+        
+        // Prefer higher quality score
+        if (currentScore > existingScore) return current
+        if (existingScore > currentScore) return existing
+        
+        // If scores are equal, prefer more specific locale
+        const existingHasRegion = existing.lang.includes('-')
+        const currentHasRegion = current.lang.includes('-')
+        
+        if (currentHasRegion && !existingHasRegion) return current
+        if (!currentHasRegion && existingHasRegion) return existing
+        
+        // If still equal, prefer Google
+        const existingIsGoogle = isGoogleVoice(existing)
+        const currentIsGoogle = isGoogleVoice(current)
+        
+        if (currentIsGoogle && !existingIsGoogle) return current
+        if (!currentIsGoogle && existingIsGoogle) return existing
+        
+        // Final fallback: alphabetical order for consistency
+        if (current.name < existing.name) return current
+        
+        return existing
+      }
+      
+      // First, add Google voices (preferred)
+      googleVoices.forEach(voice => {
+        const langCode = voice.lang.toLowerCase().split('-')[0]
+        const existing = voicesByLanguage.get(langCode)
+        voicesByLanguage.set(langCode, selectBestVoice(existing, voice))
+      })
+      
+      // Then, add other voices for languages that don't have Google voices
+      otherVoices.forEach(voice => {
+        const langCode = voice.lang.toLowerCase().split('-')[0]
+        if (!voicesByLanguage.has(langCode)) {
+          voicesByLanguage.set(langCode, voice)
+        } else {
+          // Only replace if the new voice is better (shouldn't happen since we prefer Google, but just in case)
+          const existing = voicesByLanguage.get(langCode)!
+          voicesByLanguage.set(langCode, selectBestVoice(existing, voice))
+        }
+      })
+      
+      // Convert map to array and sort by language code for consistent ordering
+      const filteredVoices = Array.from(voicesByLanguage.values()).sort((a, b) => {
+        const langA = a.lang.toLowerCase().split('-')[0]
+        const langB = b.lang.toLowerCase().split('-')[0]
+        return langA.localeCompare(langB)
+      })
+      
+      const googleCount = filteredVoices.filter(v => isGoogleVoice(v)).length
+      const otherCount = filteredVoices.length - googleCount
+      const neuralCount = filteredVoices.filter(v => {
+        const name = v.name.toLowerCase()
+        const uri = v.voiceURI.toLowerCase()
+        return name.includes('neural') || uri.includes('neural') || 
+               name.includes('enhanced') || uri.includes('enhanced')
+      }).length
+      
+      if (filteredVoices.length === 0) {
+        console.warn('⚠️ No voices found.')
+        console.log('All available voices:', allVoices.map(v => `${v.name} (${v.lang})`).join(', '))
+      } else {
+        console.log(`🎤 Loaded ${filteredVoices.length} high-quality voices (1 per language): ${googleCount} Google, ${neuralCount} Neural/Enhanced, ${otherCount} other`)
+        console.log('Available languages:', filteredVoices.map(v => {
+          const isGoogle = isGoogleVoice(v)
+          const name = v.name.toLowerCase()
+          const isNeural = name.includes('neural') || name.includes('enhanced')
+          let quality = ''
+          if (isGoogle) quality = ' - Google'
+          else if (isNeural) quality = ' - Neural'
+          return `${v.lang.split('-')[0]} (${v.name}${quality})`
+        }).join(', '))
+      }
+      
+      setVoices(filteredVoices)
       
       // Only set default voice if no voice is selected and no saved voice exists
-      if (availableVoices.length > 0 && !selectedVoice) {
+      if (filteredVoices.length > 0 && !selectedVoice) {
         const savedVoice = typeof window !== 'undefined' ? localStorage.getItem('voxera-selected-voice') : null
-        if (savedVoice && availableVoices.find(v => v.name === savedVoice)) {
+        if (savedVoice && filteredVoices.find(v => v.name === savedVoice)) {
           // Use saved voice if it still exists
           setSelectedVoice(savedVoice)
         } else {
           // Fallback: prefer English voices
-          const defaultVoice = availableVoices.find(v => v.lang.startsWith('en')) || availableVoices[0]
+          const defaultVoice = filteredVoices.find(v => v.lang.startsWith('en')) || filteredVoices[0]
           if (defaultVoice) {
             setSelectedVoice(defaultVoice.name)
           }

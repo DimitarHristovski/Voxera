@@ -254,6 +254,28 @@ The app includes placeholder implementations. To enable full functionality:
 - **Microphone not working**: Grant microphone permissions in system settings
 - **API errors**: Verify API keys are set in `.env.local` and the file is not committed to git
 
+### Google Voices Installation
+
+The app uses Google voices for text-to-speech. Google voices are typically available automatically in Chromium-based browsers (Chrome, Edge, etc.).
+
+**For Tauri Desktop App:**
+- Tauri uses the system's webview (WebKit on macOS/Linux, Edge WebView2 on Windows)
+- Google voices should be available automatically if using a Chromium-based webview
+- If no Google voices are found, check the browser console for available voices
+
+**To verify Google voices are available:**
+1. Open the app and check the browser console (F12 or right-click → Inspect)
+2. Look for: `🎤 Loaded X Google voices (1 per language)`
+3. If you see `⚠️ No Google voices found`, the webview may not support Google voices
+
+**Alternative solutions if Google voices aren't available:**
+- The app will show a warning but will still work with system voices (if any are available)
+- On macOS: System voices are available through the Web Speech API
+- On Windows: Windows voices are available through SAPI
+- On Linux: Speech synthesis depends on installed speech engines
+
+**Note:** Google voices are provided by the browser/webview engine and cannot be "installed" separately. They're part of the Chromium/Chrome voice package.
+
 ## License
 
 [Your License Here]
