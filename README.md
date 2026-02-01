@@ -181,47 +181,53 @@ voxera/
 ### Installation Steps
 
 1. **Clone the repository**:
+
    ```bash
    git clone <repository-url>
    cd Voxera
    ```
 
 2. **Install dependencies**:
+
    ```bash
    npm install
    ```
 
 3. **Configure environment variables**:
+
    ```bash
    cp .env.example .env.local
    ```
-   
+
    Edit `.env.local` and add your API key:
+
    ```env
    OPEN_KEY=your_openai_api_key_here
    OPENAI_API_BASE_URL=https://api.openai.com/v1
    WHISPER_MODEL=whisper-1
    OPENAI_MODEL=gpt-3.5-turbo
    ```
-   
+
    **Note**: The app uses `OPEN_KEY` (not `OPENAI_API_KEY`) for the API key.
 
 4. **Run in development mode**:
+
    ```bash
    npm run tauri:dev
    ```
-   
+
    This will:
    - Start the Next.js dev server on `http://localhost:3000`
    - Compile the Tauri Rust backend
    - Launch the desktop application
 
 5. **Build for production**:
+
    ```bash
    npm run build
    npm run tauri:build
    ```
-   
+
    Outputs platform-specific installers in `src-tauri/target/release/bundle/`
 
 ### First Run
@@ -231,7 +237,7 @@ voxera/
    - **macOS**: System Settings → Privacy & Security → Microphone → Enable for Terminal (dev) or VOXERA (production)
    - **Windows**: Settings → Privacy → Microphone → Allow apps to access microphone
    - **Linux**: Depends on your desktop environment
-3. Press the global hotkey (`Cmd+Shift+V` on macOS, `Ctrl+Shift+V` on Windows/Linux) to activate
+3. Press the global hotkey (`Cmd+Shift+M` on macOS, `Ctrl+Shift+M` on Windows/Linux) to activate
 4. Click the record button (or use hotkey again) to start recording
 5. Speak naturally
 6. Click stop (or use hotkey again) to process
@@ -257,7 +263,8 @@ WHISPER_MODEL=whisper-1
 OPENAI_MODEL=gpt-3.5-turbo
 ```
 
-**Important**: 
+**Important**:
+
 - The API key variable is `OPEN_KEY` (not `OPENAI_API_KEY`)
 - Restart the Next.js server after changing `.env.local`
 - Never commit `.env.local` to version control
@@ -267,10 +274,11 @@ OPENAI_MODEL=gpt-3.5-turbo
 Edit `src-tauri/src/main.rs` and modify the `register_hotkey` function:
 
 ```rust
-let default_hotkey = "CommandOrControl+Shift+V"; // Change this
+let default_hotkey = "CommandOrControl+Shift+M";
 ```
 
 Hotkey format follows Tauri's global shortcut syntax:
+
 - `Command+Shift+V` (macOS)
 - `Control+Shift+V` (Windows/Linux)
 - `CommandOrControl+Shift+V` (works on both)
@@ -278,6 +286,7 @@ Hotkey format follows Tauri's global shortcut syntax:
 ### API Endpoint Configuration
 
 The app supports any OpenAI-compatible API endpoint, including:
+
 - **LocalAI**: `http://localhost:8080/v1`
 - **Ollama**: Configure to use OpenAI-compatible endpoint
 - **vLLM**: Self-hosted OpenAI-compatible server
@@ -334,11 +343,13 @@ The app supports three output formats:
 Transcribes audio to text using OpenAI Whisper API.
 
 **Request**:
+
 - Method: `POST`
 - Content-Type: `multipart/form-data`
 - Body: FormData with `audio` field (File/Blob)
 
 **Response**:
+
 ```json
 {
   "transcript": "The transcribed text...",
@@ -347,6 +358,7 @@ Transcribes audio to text using OpenAI Whisper API.
 ```
 
 **Error Responses**:
+
 - `400`: No audio file provided
 - `401`: API key invalid or expired
 - `500`: Server error or API key not configured
@@ -356,6 +368,7 @@ Transcribes audio to text using OpenAI Whisper API.
 Enriches transcript with AI processing and formatting.
 
 **Request**:
+
 ```json
 {
   "transcript": "Raw transcript text...",
@@ -365,6 +378,7 @@ Enriches transcript with AI processing and formatting.
 ```
 
 **Response**:
+
 ```json
 {
   "output": "Enriched and formatted text...",
@@ -380,6 +394,7 @@ Enriches transcript with AI processing and formatting.
 ```
 
 **Auto-Detected Modes**:
+
 - `meeting`: Meeting notes, discussions, decisions
 - `journal`: Personal thoughts, reflections
 - `task-capture`: Todo items, tasks, reminders
@@ -396,6 +411,7 @@ Enriches transcript with AI processing and formatting.
 Translates text to target language.
 
 **Request**:
+
 ```json
 {
   "text": "Text to translate...",
@@ -404,6 +420,7 @@ Translates text to target language.
 ```
 
 **Response**:
+
 ```json
 {
   "translatedText": "Translated text...",
@@ -422,6 +439,7 @@ Translates text to target language.
 Tests if environment variables are loaded correctly.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -442,6 +460,7 @@ Tests if environment variables are loaded correctly.
 Tests if OpenAI API key is valid and working.
 
 **Response**:
+
 ```json
 {
   "success": true,
@@ -484,11 +503,13 @@ The app uses a quality-based voice selection system:
 Google voices come bundled with Chromium-based browsers and cannot be installed separately. The app automatically uses the best available voice for each language.
 
 **To verify voices**:
+
 1. Open the app and check browser console (F12)
 2. Look for: `🎤 Loaded X high-quality voices (1 per language)`
 3. Check available languages in the console output
 
 **If no Google voices**:
+
 - The app will use system voices as fallback
 - On macOS: System voices (Siri, etc.) are available
 - On Windows: Windows voices are available
@@ -503,6 +524,7 @@ npm run tauri:dev
 ```
 
 This starts:
+
 - Next.js dev server on `http://localhost:3000`
 - Tauri development build
 - Hot reload for both frontend and backend
@@ -540,34 +562,40 @@ Outputs are in `src-tauri/target/release/bundle/`
 ### Common Issues
 
 **"Cargo not found"**
+
 - Ensure Rust is installed: `rustup --version`
 - Add `~/.cargo/bin` to your PATH
 
 **Hotkey not working**
+
 - Check system permissions:
   - **macOS**: System Settings → Privacy & Security → Accessibility → Enable for Terminal (dev) or VOXERA (production)
   - **Windows**: Settings → Privacy → Keyboard → Allow apps to access keyboard shortcuts
   - **Linux**: Depends on desktop environment
 
 **Microphone not working**
+
 - Grant microphone permissions in system settings
 - **macOS**: System Settings → Privacy & Security → Microphone
 - **Windows**: Settings → Privacy → Microphone
 - Check browser console for permission errors
 
 **"Transcription failed: Unauthorized"**
+
 - Verify `OPEN_KEY` is set in `.env.local`
 - Restart the Next.js server after changing `.env.local`
 - Test API key: Open `http://localhost:3000/api/test-env`
 - Check server console for detailed error messages
 
 **No voices available**
+
 - Check browser console for voice loading messages
 - Verify webview supports Web Speech API
 - On macOS: System voices should be available
 - On Windows: Windows voices should be available
 
 **Port 3000 already in use**
+
 - Kill existing process: `lsof -ti:3000 | xargs kill -9` (macOS/Linux)
 - Or use a different port in `next.config.js`
 
@@ -575,7 +603,7 @@ Outputs are in `src-tauri/target/release/bundle/`
 
 1. **Check server logs**: Look at the terminal where you ran `npm run tauri:dev`
 2. **Check browser console**: F12 or right-click → Inspect
-3. **Test endpoints**: 
+3. **Test endpoints**:
    - `http://localhost:3000/api/test-env` - Check environment variables
    - `http://localhost:3000/api/test-openai` - Test API key validity
 4. **Verify API key**: Ensure it starts with `sk-` and is not expired
