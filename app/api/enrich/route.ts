@@ -155,18 +155,50 @@ export async function POST(request: NextRequest) {
     const completionTokens = usage.completion_tokens || 0
     const totalTokens = usage.total_tokens || 0
 
-    // For JSON format, try to parse and re-stringify to ensure valid JSON
+    // Generate timestamp for when this transcription was created
+    const now = new Date()
+    const timestamp = now.toISOString()
+    const formattedDate = now.toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    })
+
+    // Add timestamp to output based on format
     if (format === 'json') {
       try {
         const parsed = JSON.parse(enrichedText)
+        // Add generatedAt timestamp to JSON
+        parsed.generatedAt = timestamp
+        parsed.generatedAtFormatted = formattedDate
         enrichedText = JSON.stringify(parsed, null, 2)
       } catch (e) {
         // If parsing fails, try to extract JSON from markdown code blocks
         const jsonMatch = enrichedText.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/)
         if (jsonMatch) {
-          enrichedText = JSON.stringify(JSON.parse(jsonMatch[1]), null, 2)
+          const parsed = JSON.parse(jsonMatch[1])
+          parsed.generatedAt = timestamp
+          parsed.generatedAtFormatted = formattedDate
+          enrichedText = JSON.stringify(parsed, null, 2)
+        } else {
+          // If we can't parse, wrap in a new object with timestamp
+          enrichedText = JSON.stringify({
+            generatedAt: timestamp,
+            generatedAtFormatted: formattedDate,
+            content: enrichedText
+          }, null, 2)
         }
       }
+    } else if (format === 'markdown') {
+      // Prepend timestamp as a markdown header or metadata block
+      enrichedText = `---\n**Generated:** ${formattedDate}\n---\n\n${enrichedText}`
+    } else {
+      // Plain text format - add timestamp at the top
+      enrichedText = `Generated: ${formattedDate}\n\n${enrichedText}`
     }
 
     return NextResponse.json({

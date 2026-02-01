@@ -321,11 +321,11 @@ export async function getUserMedia(
             instructions += '4. After granting, click the record button again\n'
             instructions += '\n💡 Note: In production builds, permission is granted to VOXERA app instead\n'
           } else {
-            instructions += 'macOS (Production Build):\n'
-            instructions += '1. System Settings → Privacy & Security → Microphone\n'
-            instructions += '2. Enable access for VOXERA (not Terminal)\n'
-            instructions += '3. After granting, quit the app (Cmd+Q) and relaunch\n'
-            instructions += '4. Click the record button again to retry\n'
+          instructions += 'macOS (Production Build):\n'
+          instructions += '1. System Settings → Privacy & Security → Microphone\n'
+          instructions += '2. Enable access for VOXERA (not Terminal)\n'
+          instructions += '3. After granting, quit the app (Cmd+Q) and relaunch\n'
+          instructions += '4. Click the record button again to retry\n'
           }
         } else if (platform.includes('win')) {
           instructions += 'Windows:\n'
@@ -491,17 +491,17 @@ export async function requestMicrophonePermission(maxAttempts: number = 10): Pro
             console.warn('   → After granting, click the record button again')
             console.warn('   → For production: Build with `npm run tauri:build` and grant to VOXERA app')
           } else {
-            console.warn('   1. **Terminal vs Built App**: If running in dev mode, permission may be granted to Terminal.')
-            console.warn('      → Build the app: npm run tauri:build')
-            console.warn('      → Run the built app and grant permission to VOXERA (not Terminal)')
+          console.warn('   1. **Terminal vs Built App**: If running in dev mode, permission may be granted to Terminal.')
+          console.warn('      → Build the app: npm run tauri:build')
+          console.warn('      → Run the built app and grant permission to VOXERA (not Terminal)')
             console.warn('   2. **Missing NSMicrophoneUsageDescription**: Check Info.plist has NSMicrophoneUsageDescription')
-            console.warn('   3. **Need to Relaunch**: After granting permission, completely quit (Cmd+Q) and relaunch the app')
-            console.warn('   4. **Grant permission in system settings**:')
-            if (platform.includes('mac')) {
-              console.warn('      macOS: System Settings → Privacy & Security → Microphone')
-              console.warn('      → Make sure VOXERA (not Terminal) has permission enabled')
-            } else if (platform.includes('win')) {
-              console.warn('      Windows: Settings → Privacy → Microphone')
+          console.warn('   3. **Need to Relaunch**: After granting permission, completely quit (Cmd+Q) and relaunch the app')
+          console.warn('   4. **Grant permission in system settings**:')
+          if (platform.includes('mac')) {
+            console.warn('      macOS: System Settings → Privacy & Security → Microphone')
+            console.warn('      → Make sure VOXERA (not Terminal) has permission enabled')
+          } else if (platform.includes('win')) {
+            console.warn('      Windows: Settings → Privacy → Microphone')
             }
           }
           console.warn('   See MICROPHONE_PERMISSIONS.md for detailed troubleshooting')
